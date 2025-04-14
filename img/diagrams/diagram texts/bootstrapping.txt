@@ -1,0 +1,18 @@
+participant Consensus Node
+participant Blockchain
+participant Client Node
+
+Consensus Node->Blockchain:Request full state
+Blockchain->Consensus Node:Ledger and its state
+Consensus Node->Consensus Node:Validate state
+Client Node->Blockchain:Request partial state
+Blockchain->Client Node:Block headers
+Client Node->Client Node:Validate headers
+abox over Consensus Node,Client Node:Identity Verification Sequence
+Client Node->Blockchain:Query default passive SCap
+Blockchain->Client Node:Response
+Consensus Node->Blockchain:Query default passive SCap
+Consensus Node->Blockchain:Query initial SCap balance
+Consensus Node->Blockchain:Query Scaling Funtion
+Blockchain->Consensus Node:Response
+Consensus Node->Blockchain:Stake XY SCap tokens

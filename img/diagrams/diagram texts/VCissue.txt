@@ -1,0 +1,22 @@
+User -> Government : Submit real-world ID\n(name, DOB, passport, etc.)
+Government -> Government : Validate identity against DB
+Government -> Government : Check for existing VC for identity
+
+alt No existing VC
+  Government -> Government : Hash identity: H(name + DOB + salt)
+  Government -> Government : Generate ZKP for hashed identity
+  Government -> User : Issue VC (incl. ZKP, commitment to hashed ID)
+else VC already issued
+  Government -> User : Reject request or reissue existing VC
+end
+
+User -> Application : Send ZKP proof of VC\n(incl. hashed ID commitment)
+Application -> Application : Verify issuer signature + ZKP
+
+Application -> Application : Check if hashed ID already exists
+
+alt Hashed ID is new
+  Application -> Application : Accept user\nLink DID with hashed ID
+else Hashed ID already seen
+  Application -> Application : Reject user\n(Possible Sybil)
+end

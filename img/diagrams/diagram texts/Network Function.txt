@@ -1,0 +1,14 @@
+participant Consensus Node
+participant Blockchain
+participant Client Node
+
+alt Consensus Node is an Elected Leader
+Consensus Node->Blockchain:Propose a new block
+else Consensus Node is not a Leader
+Blockchain->Consensus Node:New block
+Consensus Node->Blockchain:Attestation
+end
+seq Social Capital Change
+Client Node->Blockchain:SCap redistribution
+Blockchain->Consensus Node:Active SCap Updated
+end

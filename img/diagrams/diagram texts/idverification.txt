@@ -1,0 +1,16 @@
+participant New Node
+participant Identity Issuer
+
+abox over New Node, Identity Issuer:This communication\n happens off-chain
+New Node->Identity Issuer:Request VC
+Identity Issuer->New Node:Acknowledge Request
+New Node->Identity Issuer:Submit real-world ID\n(Name, ID number, date of birth)
+Identity Issuer->Identity Issuer:Validate\nagainst DB
+Identity Issuer-->Identity Issuer:Check for\nexisting VCs
+alt No Existing VC
+Identity Issuer->Identity Issuer:Construct a VC
+Identity Issuer-->Identity Issuer:Generate ZKP\nfor identity
+Identity Issuer->New Node:Issued VC (incl. ZKP if generated)
+else Found Existing VC
+Identity Issuer-->New Node:Reject Request (if supported)
+end

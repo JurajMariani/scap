@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
+   sodipodi:docname="Whisk.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="3.0609708"
+     inkscape:cx="253.67769"
+     inkscape:cy="99.15155"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="-9"
+     inkscape:window-y="1341"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#000000;stroke-width:0.159136;stroke-linejoin:round"
+       id="rect234"
+       width="103.1202"
+       height="0.34575087"
+       x="13.427358"
+       y="9.0759602" />
+    <rect
+       style="fill:#000000;stroke-width:0.135244;stroke-linejoin:round"
+       id="rect236"
+       width="0.34599999"
+       height="5.4000001"
+       x="26.867369"
+       y="6.5798073" />
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke-width:0.16;stroke-linejoin:round"
+       x="23.582733"
+       y="5.8440285"
+       id="text400"><tspan
+         sodipodi:role="line"
+         id="tspan398"
+         style="font-style:normal;stroke-width:0.16"
+         x="23.582733"
+         y="5.8440285">Epoch 0</tspan></text>
+    <rect
+       style="fill:#000000;stroke-width:0.135244;stroke-linejoin:round"
+       id="rect402"
+       width="0.34599999"
+       height="5.4000001"
+       x="86.134087"
+       y="6.5798073" />
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke-width:0.16;stroke-linejoin:round"
+       x="81.791122"
+       y="5.8440285"
+       id="text406"><tspan
+         sodipodi:role="line"
+         id="tspan404"
+         style="font-style:normal;stroke-width:0.16"
+         x="81.791122"
+         y="5.8440285">Epoch 256</tspan></text>
+    <g
+       id="g1021"
+       transform="translate(38.186456)">
+      <rect
+         style="fill:#ffffff;stroke:#000000;stroke-width:0.242212;stroke-linejoin:round;stroke-opacity:1"
+         id="rect408"
+         width="9.5081491"
+         height="1.9880675"
+         x="38.55122"
+         y="8.2115831" />
+      <text
+         xml:space="preserve"
+         style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke-width:0.16;stroke-linejoin:round"
+         x="38.98341"
+         y="9.9403372"
+         id="text412"><tspan
+           sodipodi:role="line"
+           id="tspan410"
+           style="font-style:normal;stroke-width:0.16"
+           x="38.98341"
+           y="9.9403372">Cooldown</tspan></text>
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;stroke:#000000;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="44.616611"
+       y="8.4055395"
+       id="text1077"><tspan
+         sodipodi:role="line"
+         id="tspan1075"
+         style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16"
+         x="44.616611"
+         y="8.4055395">Shuffling phase</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;stroke:#000000;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="93.829155"
+       y="8.4055395"
+       id="text1131"><tspan
+         sodipodi:role="line"
+         id="tspan1129"
+         style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16"
+         x="93.829155"
+         y="8.4055395">Proposing phase</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;stroke:#000000;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="87.479149"
+       y="11.224247"
+       id="text1135"><tspan
+         sodipodi:role="line"
+         id="tspan1133"
+         style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16"
+         x="87.479149"
+         y="11.224247">(Shuffling phase for the next day)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;stroke:#000000;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="16.041584"
+       y="8.4055395"
+       id="text1143"><tspan
+         sodipodi:role="line"
+         id="tspan1141"
+         style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16"
+         x="16.041584"
+         y="8.4055395">Randao LE</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="18.390152"
+       y="15.029623"
+       id="text1147"><tspan
+         sodipodi:role="line"
+         id="tspan1145"
+         style="stroke-width:0.16"
+         x="18.390152"
+         y="15.029623">Candidate Selection</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="78.358925"
+       y="15.029623"
+       id="text1151"><tspan
+         sodipodi:role="line"
+         id="tspan1149"
+         style="stroke-width:0.16"
+         x="78.358925"
+         y="15.029623">Proposer Selection</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:italic;font-size:2.11667px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
+       x="70.162094"
+       y="17.14629"
+       id="text1155"><tspan
+         sodipodi:role="line"
+         id="tspan1153"
+         style="stroke-width:0.16"
+         x="70.162094"
+         y="17.14629">(Candidate Selection for the next day)</tspan></text>
+  </g>
+</svg>

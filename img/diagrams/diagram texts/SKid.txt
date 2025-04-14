@@ -1,0 +1,22 @@
+participant Consensus Node / Client Node
+participant Blockchain
+participant Identity Provider
+
+Consensus Node / Client Node->Consensus Node / Client Node:Create ZKP proofs for identity
+Consensus Node / Client Node->Identity Provider:ZKP proofs of identity
+Consensus Node / Client Node->Identity Provider:(ZKP) proofs of social media account ownership
+note over Identity Provider:Identity Verification Service
+activate Identity Provider
+Identity Provider->]:Contact identity issuer
+]->Identity Provider:Issuer statement
+Identity Provider->]:Contact social media platfrom
+]->Identity Provider:Platform statement
+deactivate Identity Provider
+alt Identity Verified
+Identity Provider->Identity Provider:Create VCs based on identity
+Identity Provider->Blockchain:Store VCs
+Identity Provider->Consensus Node / Client Node:Verifiable Credentials tied to identity
+else Identity Refused
+Identity Provider->Consensus Node / Client Node:Identity Refused, Access Denied
+end
+abox over Consensus Node / Client Node,Identity Provider:Identity Verification is Finalized

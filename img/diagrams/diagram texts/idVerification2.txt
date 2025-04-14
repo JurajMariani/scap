@@ -1,0 +1,19 @@
+participant Consensus Node / Client Node
+participant Blockchain
+participant Identity Provider
+
+Consensus Node / Client Node->(1)Consensus Node / Client Node:Create ZKP proofs for identity\n(Valid VC, Valid Hash, Valid Sig)
+Consensus Node / Client Node->Identity Provider:ZKP proofs of identity
+Consensus Node / Client Node->Identity Provider:(ZKP) proofs of social media account ownership
+note over Identity Provider:Identity Verification Service
+activate Identity Provider
+Identity Provider->(1)Identity Provider:Validate ZK proofs
+Identity Provider->Identity Provider:Verify Hash Uniqueness
+deactivate Identity Provider
+alt Identity Verified
+Identity Provider->Blockchain:Store Uniqueness Hash & User DID
+Identity Provider->Consensus Node / Client Node:Identity Verified, Access Granted
+else Identity Refused
+Identity Provider->Consensus Node / Client Node:Identity Refused, Access Denied
+end
+abox over Consensus Node / Client Node,Identity Provider:Identity Verification is Finalized
