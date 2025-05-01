@@ -1,0 +1,12 @@
+{
+    "sc_constants": {
+        "def_passive_sc": 10,
+        "scaling": "log"
+    },
+    "network": {
+        "port": "8400",
+        "endpoints": {
+            "add_validator": "/saf..."
+        }
+    }
+}
