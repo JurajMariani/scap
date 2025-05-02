@@ -44,6 +44,17 @@ class AccSerializable(Serializable):
         ('soc_media', CountableList(AffiliateMedia))
     ]
 
+    def isVerified(self) -> bool:
+        if (self.id_hash in (None, b'') or self.vc_zkp in (None, b'')):
+            return False
+        return True
+
+    def isConsensusNode(self) -> bool:
+        if (not self.isVerified()):
+            return False
+        if (not self.soc_media):
+            return False
+        return True
 
 class Account():
     def __init__(self, non, bal):
