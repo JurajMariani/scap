@@ -2,9 +2,6 @@
 from rlp import encode, decode, Serializable
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 
-
-from transaction import TxSerializable, TxSerializableNoSig, TxMetaNoSig, TxMeta
-
 class AffiliateMedia(Serializable):
     fields = [
         ('add_flag', Binary.fixed_length(1, allow_empty=False)),
@@ -15,7 +12,7 @@ class AffiliateMedia(Serializable):
 class AffiliateMediaList(Serializable):
     fields = [
         ('media', CountableList(AffiliateMedia)),
-        ('validator_pub_key', Binary.fixed_length(96, allow_empty=False))
+        ('validator_pub_key', Binary.fixed_length(48, allow_empty=False))
     ]
 
 class Endorsement(Serializable):
@@ -40,7 +37,8 @@ class AccSerializable(Serializable):
         ('passive_sc', big_endian_int),
         ('active_sc', big_endian_int),
         ('effective_sc', big_endian_int),
-        ('validator_pub_key', Binary.fixed_length(96, allow_empty=True)),
+        # BLS key
+        ('validator_pub_key', Binary.fixed_length(48, allow_empty=True)),
         ('endorsed', CountableList(Endorsement)),
         ('endorsed_by', CountableList(Endorsement)),
         ('soc_media', CountableList(AffiliateMedia))

@@ -1,6 +1,7 @@
 {
     "sc_constants": {
         "def_passive_sc": 10,
+        "domain_randao": 33554432,
         "scaling": "log"
     },
     "network": {

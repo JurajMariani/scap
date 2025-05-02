@@ -7,6 +7,8 @@ from copy import deepcopy
 
 from transaction import Transaction, TxSerializable
 from state import StateTrie
+import json
+import blst
 
 class BlockSerializable(Serializable):
     fields = [
@@ -14,7 +16,12 @@ class BlockSerializable(Serializable):
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
+        ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
+        # BLS signed (epoch_no + domain_randao)
+        # We ignore epoch_no to simplify implementation
+        # therefore, sign keccak(block_no + domain_randao)
+        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
@@ -35,7 +42,9 @@ class BlockSerializable(Serializable):
             self.state_root,
             self.transasction_root,
             self.receipts_root,
+            self.epoch_nuber,
             self.block_number,
+            self.randao_reveal,
             self.beneficiary,
             self.timestamp,
             self.data
@@ -55,6 +64,26 @@ class BlockSerializable(Serializable):
             i += 2
         return b''
     
+    def int_to_minimal_bytes(n: int) -> bytes:
+        if n == 0:
+            return b'\x00'
+        length = (n.bit_length() + 7) // 8
+        return n.to_bytes(length, byteorder='big')
+    
+    def verifyRandao(self, benefBLS: binary) -> bool:
+        randao_constant = 0
+        with open('../config/config.json') as f:
+            config = json.load(f)
+            randao_constant = config['sc_constrants']['domain_randao']
+        # Verify file works
+        if (randao_constant == 0):
+            return False
+        # Construct message
+        message = self.int_to_minimal_bytes(randao_constant) + self.int_to_minimal_bytes(self.block_number)
+        message = keccak(message)
+        # Verify signature
+        return blst.verify(benefBLS, message, self.randao_reveal)
+    
     def verifyBlock(self, state: StateTrie, parentH: binary, parentBlockNo: int) -> tuple[StateTrie, bool]:
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
@@ -66,6 +95,14 @@ class BlockSerializable(Serializable):
             return (state, False)
         # Only a creator can be a consensus node, therefore, they must exist
         if (not benef.isConsensusNode()):
+            return (state, False)
+        # Only validators can be leaders
+        if (not benef.validator_pub_key):
+            return (state, False)
+        # Verify assigned epoch
+        # TODO
+        # Verify randao_reveal
+        if (not self.verifyRandao(benef.validator_pub_key)):
             return (state, False)
         # Verify TX root
         if (self.transactions_root != self.calculateTxHash()):
@@ -121,7 +158,9 @@ class BlockNoSig(Serializable):
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
+        ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
+        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         #('signature', Binary.fixed_length(65, allow_empty=False)),
@@ -135,7 +174,9 @@ class BlockSig(Serializable):
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
+        ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
+        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
