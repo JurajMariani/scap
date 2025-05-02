@@ -16,20 +16,20 @@ class StateTrie:
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
 
-    def transaction(self, tx: TxSerializable) -> bool:
+    def transaction(self, tx: TxSerializable, verify:bool = True, execute: bool = True) -> bool:
         type = tx.type
         if type == 0:
             # Normal transaction
-            return self.transfer(tx)
+            return self.transfer(tx, verify, execute)
         elif type == 1:
             # SCap reassignment
-            return self.reassign(tx)
+            return self.reassign(tx, verify, execute)
         elif type == 2:
             # Registration
-            return self.register(tx)
+            return self.register(tx, verify, execute)
         elif type == 3:
             # Register affiliate social media
-            return self.affiliate(tx)
+            return self.affiliate(tx, verify, execute)
         else:
             print('Wrong transaction type.')
             return False
@@ -123,11 +123,14 @@ class StateTrie:
         return True
 
     
-    def transfer(self, tx: TxSerializable) -> bool:
+    def transfer(self, tx: TxSerializable, verify: bool, execute: bool) -> bool:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
-        if (not self.verifyTransfer(tx)):
-            return False
+        if (verify):
+            if (not self.verifyTransfer(tx)):
+                return False
+        if (not execute):
+            return True
         accSender = self.getAccount(tx.sender)
         accBenef = self.getAccount(tx.to)
         # Initiate swap
@@ -237,11 +240,14 @@ class StateTrie:
             i+=1
         return -1 
 
-    def reassign(self, tx: TxSerializable) -> bool:
+    def reassign(self, tx: TxSerializable, verify, execute) -> bool:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
-        if not self.verifyReassign():
-            return False
+        if verify:
+            if not self.verifyReassign():
+                return False
+        if (not execute):
+            return True
         scBeneficiary = self.getAccount(tx.sender)
         metaTx = decode(tx.data, TxMeta)
         scSender = self.getAccount(metaTx.sender)
@@ -340,11 +346,14 @@ class StateTrie:
             return False
         return True
 
-    def register(self, tx: TxSerializable) -> bool:
+    def register(self, tx: TxSerializable, verify, execute) -> bool:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
-        if (not self.verifyRegister(tx)):
-            return False
+        if verify:
+            if (not self.verifyRegister(tx)):
+                return False
+        if (not execute):
+            return True
         # Parse Register Data
         regd = decode(tx.data, RegisterData)
         # Load default passive_sc value
@@ -380,11 +389,14 @@ class StateTrie:
             i+=1
         return -1
     
-    def affiliate(self, tx: TxSerializable) -> bool:
+    def affiliate(self, tx: TxSerializable, verify, execute) -> bool:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
-        if (not self.verifyRegister(tx)):
-            return False
+        if verify:
+            if (not self.verifyRegister(tx)):
+                return False
+        if (not execute):
+            return True
         # Recover AffiliateMediaList
         affList = list(decode(tx.data, AffiliateMediaList))
         accSender = self.getAccount(tx.sender)
