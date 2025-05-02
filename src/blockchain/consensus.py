@@ -1,36 +1,69 @@
+from rlp.sedes import binary
+from math import sqrt, log2, log10
+import json
+
+from state import StateTrie
 from randao import Randao
 
 class PoSC:
     def __init__(self):
-        self.validators = {}
+        self.validators: dict[bytes, int] = {}
         self.randao = Randao()
+        self.leader: bytes | None = None
 
-    def add_validator(self, validator_id, stake):
-        """Add a validator with a given stake."""
-        if (self.validators[validator_id]):
-            raise KeyError('Validator is already in the pool')
-        #self.validators[validator_id] = (Validator(validator_id, stake))
+    def updateValidatorList(self, state: StateTrie) -> bool:
+        scalingFn = ''
+        with open('../config/config.json') as f:
+            config = json.load(f)
+            scalingFn = config['sc_constrants']['scaling']
+        # Chech working file
+        if scalingFn == '':
+            return False
+        # Refresh own validator list
+        self.validators = {}
+        # Request validator list
+        valList = state.getValidators()
+        # Set function ptr
+        fn = None
+        if scalingFn == 'root':
+            fn = sqrt
+        elif scalingFn == 'log10':
+            fn = log10
+        else:
+            # Default is log2
+            fn = log2
+        # For each validator
+        for addr, sc in valList.items():
+            # Calculate effective SC stake
+            self.validators[addr] = fn(sc)
+        return True
 
-    def remove_validator(self, validator_id):
-        if (not self.validators[validator_id]):
-            raise KeyError('Validator is not in the pool')
-        del self.validators[validator_id]
-        return
-
-    def select_leader(self):
+    def selectLeader(self, state: StateTrie) -> bytes | None:
         """Select the next validator based on their stake and Randao randomness."""
+        # Refresh current leader
+        self.leader = None
         # Get the randomness from Randao
-        randao_randomness = self.randao.get_random_value()
-        
-        # Normalize randomness to validator selection (0-1 range)
-        rand_value = int(randao_randomness, 16) % 100
+        rngv = self.randao.getValue()
+        # Update the list of validators
+        if not self.updateValidatorList(state):
+            return None
+        # Weighted selection based on effective social capital
+        total_sc = sum(list(self.validators.values()))
+        cumulative_sc = 0
+        rngvSewed = rngv * total_sc
+        # Shuffle validator list
+        shuffledVals = self.randao.shuffleList(list(self.validators.items()))
+        for address, sc in shuffledVals:
+            cumulative_sc += sc
+            if (rngvSewed < cumulative_sc):
+                self.leader = address
+                return address
+        # Obsolete assignment
+        self.leader = None
+        return None
+    
+    def getLeader(self) -> bytes | None:
+        return self.leader
 
-        # Weighted selection based on stake
-        total_stake = sum([validator.stake for validator in self.validators])
-        cumulative_stake = 0
-        for validator in self.validators:
-            cumulative_stake += validator.stake
-            if cumulative_stake / total_stake * 100 > rand_value:
-                return validator.validator_id
-        
-        return None  # Default fallback
+    def attestate():
+        pass
