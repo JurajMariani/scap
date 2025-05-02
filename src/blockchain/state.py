@@ -17,6 +17,7 @@ class StateTrie:
     def __init__(self):
         self.db = {}
         self.state_trie = HexaryTrie(self.db)
+        self.valAddrList: dict[bytes, bool] = {}
         # TODO
         # For the time being, this remains unused
         # Can be used in the future for optimisation
@@ -65,6 +66,18 @@ class StateTrie:
     def removeAccount(self, address: bytes) -> None:
         key = keccak(address)
         del self.state_trie[key]
+
+    def getValidator(self, address: bytes) -> bool:
+        return address in self.valAddrList
+
+    def addValidator(self, address: bytes) -> None:
+        self.valAddrList[address] = True
+
+    def removeValidator(self, address: bytes) -> None:
+        del self.valAddrList[address]
+
+    def getValidators(self) -> list[bytes]:
+        return list(self.valAddrList.keys())
 
     def getRootHash(self):
         return self.state_trie.root_hash
@@ -234,7 +247,7 @@ class StateTrie:
             return False
         return True
     
-    def findAddrInEndorsementList(self, elist: list[Endorsement], addr: binary) -> int:
+    def findAddrInEndorsementList(self, elist: list[Endorsement], addr: bytes) -> int:
         i = 0
         for e in elist:
             if (e.address == addr):
@@ -404,7 +417,7 @@ class StateTrie:
                 return False
         return True
     
-    def findMediaInAffiliateList(self, alist: list[AffiliateMedia], media: binary) -> int:
+    def findMediaInAffiliateList(self, alist: list[AffiliateMedia], media: bytes) -> int:
         i = 0
         for item in alist:
             if item.media == media:
@@ -468,4 +481,11 @@ class StateTrie:
         )
         # Update Account
         self.updateAccount(tx.sender, accSenderUpdated)
+        # Register account as a validator
+        if (len(socAccs)):
+            if (not self.getValidator(tx.sender)):
+                self.addValidator(tx.sender)
+        else:
+            if self.getValidator(tx.sender):
+                self.removeValidator(tx.sender)
         return True

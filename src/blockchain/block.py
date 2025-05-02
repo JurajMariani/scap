@@ -51,7 +51,7 @@ class BlockSerializable(Serializable):
         )
         return keccak(encode(blockns))
     
-    def calculateTxHash(self) -> binary:
+    def calculateTxHash(self) -> bytes:
         hashlist = []
         for tx in self.transactions:
             hashlist.append(tx.hash())
@@ -70,7 +70,7 @@ class BlockSerializable(Serializable):
         length = (n.bit_length() + 7) // 8
         return n.to_bytes(length, byteorder='big')
     
-    def verifyRandao(self, benefBLS: binary) -> bool:
+    def verifyRandao(self, benefBLS: bytes) -> bool:
         randao_constant = 0
         with open('../config/config.json') as f:
             config = json.load(f)
@@ -84,7 +84,7 @@ class BlockSerializable(Serializable):
         # Verify signature
         return blst.verify(benefBLS, message, self.randao_reveal)
     
-    def verifyBlock(self, state: StateTrie, parentH: binary, parentBlockNo: int) -> tuple[StateTrie, bool]:
+    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int) -> tuple[StateTrie, bool]:
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
             return (state, False)
@@ -120,7 +120,7 @@ class BlockSerializable(Serializable):
         return self.verifyStateAfterExecution(state)
 
 
-    def verifySig(self, acc: binary) -> bool:
+    def verifySig(self, acc: bytes) -> bool:
         return (self.recoverAddress() == acc)
     
     def verifyTXs(self, state: StateTrie) -> bool:
