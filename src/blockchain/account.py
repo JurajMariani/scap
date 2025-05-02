@@ -8,11 +8,16 @@ import time
 
 from transaction import TxSerializable, TxSerializableNoSig, TxMetaNoSig, TxMeta
 
-class AffilateMedia(Serializable):
+class AffiliateMedia(Serializable):
     fields = [
         ('add_flag', Binary.fixed_length(1, allow_empty=False)),
         ('media', binary),
         ('zkp_ownership', Binary.fixed_length(288, allow_empty=False))
+    ]
+
+class AffiliateMediaList(Serializable):
+    fields = [
+        ('media', CountableList(AffiliateMedia))
     ]
 
 class Endorsement(Serializable):
@@ -39,7 +44,7 @@ class AccSerializable(Serializable):
         ('effective_sc', big_endian_int),
         ('endorsed', CountableList(Endorsement)),
         ('endorsed_by', CountableList(Endorsement)),
-        ('soc_media', CountableList(AffilateMedia))
+        ('soc_media', CountableList(AffiliateMedia))
     ]
 
 
@@ -92,6 +97,9 @@ class StateTrie:
         elif type == 2:
             # Registration
             return self.register(tx)
+        elif type == 3:
+            # Register affiliate social media
+            return self.affiliate(tx)
         else:
             print('Wrong transaction type.')
             return False
@@ -404,5 +412,63 @@ class StateTrie:
         self.updateAccount(tx.sender, accUpdated)
         return True
     
-    def affiliate(tx: TxSerializable) -> bool:
+    def findMediaInAffiliateList(self, alist: list[AffiliateMediaList], media: binary) -> int:
+        i = 0
+        for item in alist:
+            if item.media == media:
+                return i
+            i+=1
+        return -1
+    
+    def affiliate(self, tx: TxSerializable) -> bool:
+        # Verification (of all txs in a block) should be done before application
+        # That would, thus, not require the implementation of operation reverts & tabkeeping
+        if (not self.verifyRegister(tx)):
+            return False
+        # Recover AffiliateMediaList
+        affList = list(decode(tx.data, AffiliateMediaList))
+        accSender = self.getAccount(tx.sender)
+        socAccs = list(accSender.soc_media)
+        # Recover SocMedia list from sender
+        # For each affiliation
+        for aff in affList:
+            # Check addition flag
+            if (aff.add_flag == b'1'):
+                # Check for duplicates
+                if (self.findMediaInAffiliateList(socAccs, aff.media) >= 0):
+                    # Duplicate found
+                    return False
+                else:
+                    # No duplicates
+                    # Verify ZKP of ownership
+                    # TODO
+                    # ZKP Verificatin for soc media ownership is currently unsupported
+                    # TODO
+                    # ADD
+                    socAccs = socAccs.append(aff)
+            else:
+                # Remove media
+                # Check SM existance
+                idx = self.findMediaInAffiliateList(socAccs, aff.media)
+                if (idx < 0):
+                    # Can't remove nonexistent affiliation
+                    return False
+                else:
+                    del socAccs[idx]
+        # Initiate changes
+        accSenderUpdated = AccSerializable(
+            accSender.nonce + 1,
+            accSender.forwarder,
+            accSender.balance,
+            accSender.id_hash,
+            accSender.vc_zkp,
+            accSender.passive_sc,
+            accSender.active_sc,
+            accSender.effective_sc,
+            accSender.endorsed,
+            accSender.endorsed_by,
+            socAccs
+        )
+        # Update Account
+        self.updateAccount(tx.sender, accSenderUpdated)
         return True
