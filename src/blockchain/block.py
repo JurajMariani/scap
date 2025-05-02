@@ -84,7 +84,7 @@ class BlockSerializable(Serializable):
         # Verify signature
         return blst.verify(benefBLS, message, self.randao_reveal)
     
-    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int) -> tuple[StateTrie, bool]:
+    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int) -> tuple[StateTrie, bool]:
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
             return (state, False)
@@ -117,7 +117,7 @@ class BlockSerializable(Serializable):
         if (not self.block_number != parentBlockNo + 1):
             return (state, False)
         # Verify state root validity
-        return self.verifyStateAfterExecution(state)
+        return self.verifyStateAfterExecution(state, currReward)
 
 
     def verifySig(self, acc: bytes) -> bool:
@@ -129,7 +129,7 @@ class BlockSerializable(Serializable):
                 return False
         return True
     
-    def verifyStateAfterExecution(self, state: StateTrie) -> tuple[StateTrie, bool]:
+    def verifyStateAfterExecution(self, state: StateTrie, currReward: int) -> tuple[StateTrie, bool]:
         '''
         Returns the correct state of the blockchain.
         The validity of the block can be inferred from the boolean value.
@@ -143,13 +143,20 @@ class BlockSerializable(Serializable):
         # 2. On the tmp state, noverify, execute all txs
         for tx in self.transactions:
             tmp.transaction(tx, False, True)
-        # 3. Verify state roothash
+        # 3. Calculate beneficiary enrichment
+        enrichment = 0
+        for tx in self.transactions:
+            enrichment += tx.fee
+        enrichment += currReward
+        # 4. Enrich beneficiary (reward + fees)
+        state.coinbase(self.beneficiary, enrichment)
+        # 5. Verify state roothash
         if (self.state_root != tmp.getRootHash()):
-            # 4. IF NONMATCHING ROOTHASH
-            #   5. Discard Changes (new final state is orig)
+            # 6. IF NONMATCHING ROOTHASH
+            #   7. Discard Changes (new final state is orig)
             return (state, False)
-        # 4. IF MATCHING ROOTHASH
-        #   5. Apply Changes (new final state is tmp)
+        # 6. IF MATCHING ROOTHASH
+        #   7. Apply Changes (new final state is tmp)
         return (tmp, True)
 
 class BlockNoSig(Serializable):
