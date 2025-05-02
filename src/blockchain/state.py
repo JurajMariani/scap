@@ -1,7 +1,7 @@
 from trie import HexaryTrie
 from eth_keys import keys
 from eth_utils import keccak
-from rlp.seeds import binary
+from rlp.sedes import binary
 import json
 import time
 
@@ -17,7 +17,7 @@ class StateTrie:
     def __init__(self):
         self.db = {}
         self.state_trie = HexaryTrie(self.db)
-        self.valAddrList: dict[bytes, bool] = {}
+        self.valAddrList: dict[bytes, int] = {}
         # TODO
         # For the time being, this remains unused
         # Can be used in the future for optimisation
@@ -70,17 +70,38 @@ class StateTrie:
     def getValidator(self, address: bytes) -> bool:
         return address in self.valAddrList
 
-    def addValidator(self, address: bytes) -> None:
-        self.valAddrList[address] = True
+    def addValidator(self, address: bytes, sc: int) -> None:
+        self.valAddrList[address] = sc
 
     def removeValidator(self, address: bytes) -> None:
         del self.valAddrList[address]
 
-    def getValidators(self) -> list[bytes]:
-        return list(self.valAddrList.keys())
+    def getValidators(self) -> dict[bytes, int]:
+        return self.valAddrList
 
     def getRootHash(self):
         return self.state_trie.root_hash
+    
+    def coinbase(self, beneficiary: bytes, value: int) -> bool:
+        benef = self.getAccount(beneficiary)
+        if not benef:
+            return False
+        benefEnriched = AccSerializable(
+            benef.nonce,
+            benef.forwarder,
+            benef.balance + value,
+            benef.id_hash,
+            benef.vc_zkp,
+            benef.passive_sc,
+            benef.active_sc,
+            benef.effective_sc,
+            benef.validator_pub_key,
+            benef.endorsed,
+            benef.endorsed_by,
+            benef.soc_media
+        )
+        self.updateAccount(beneficiary, benefEnriched)
+        return True
     
     def verifyTX(self, tx: TxSerializable, accSender) -> bool:
         # Verify TX signature
@@ -195,7 +216,7 @@ class StateTrie:
             return False
         metaSender = self.getAccount(meta.sender)
         # Verify sender is registered
-        if (metaSender.id_hash == b''):
+        if (not metaSender.isVerified()):
             return False
         # Check timestamp
         if (meta.timestamp > int(time.time)):
@@ -231,10 +252,13 @@ class StateTrie:
         metaTx = decode(tx.data, TxMeta)
         if (not self.verifyMetaTX(metaTx)):
             return False
+        # Verify receiver is a verifier
+        if (not accSender.isConsensusNode()):
+            return False
         # If assigning 0 sc, DoS possibility
         if (metaTx.sc == 0):
             False
-        # Compare xt and metaTx timestamps
+        # Compare tx and metaTx timestamps
         if (metaTx.timestamp > tx.timestamp):
             return False
         # If sc is negative, check for previous assignment
@@ -343,6 +367,9 @@ class StateTrie:
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)
+        # Add SC to verifier
+        # Called add but functions similarly to update
+        self.addValidator(tx.sender, scSender.active_sc + metaTx.sc)
         return True
     
     def verifyRegister(self, tx:TxSerializable) -> bool:
@@ -484,7 +511,7 @@ class StateTrie:
         # Register account as a validator
         if (len(socAccs)):
             if (not self.getValidator(tx.sender)):
-                self.addValidator(tx.sender)
+                self.addValidator(tx.sender, accSender.active_sc)
         else:
             if self.getValidator(tx.sender):
                 self.removeValidator(tx.sender)
