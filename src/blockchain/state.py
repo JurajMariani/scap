@@ -9,10 +9,18 @@ from rlp import encode, decode
 from transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
 from account import AccSerializable, Endorsement, RegisterData, AffiliateMediaList
 
+# TODO
+# A method of AccSerializable has been added - `isConsensusNode()` and `isVerified()`
+# and may be useful to shorten this code
+# TODO
 class StateTrie:
     def __init__(self):
         self.db = {}
         self.state_trie = HexaryTrie(self.db)
+        # TODO
+        # For the time being, this remains unused
+        # Can be used in the future for optimisation
+        # TODO
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
 
@@ -36,11 +44,15 @@ class StateTrie:
 
     def addAccount(self, acc: AccSerializable, address: bytes) -> None:
         key = keccak(address)
-        self.state_trie[key] = acc
+        self.state_trie[key] = encode(acc)
 
-    def getAccount(self, address: bytes) -> AccSerializable:
+    def getAccount(self, address: bytes) -> AccSerializable | None:
         key = keccak(address)
-        return decode(self.state_trie[key], AccSerializable)
+        try:
+            acc = self.state_trie[key]
+            return decode(acc, AccSerializable)
+        except KeyError:
+            return None
 
     def updateAccount(self, address: bytes, acc: AccSerializable) -> None:
         key = keccak(address)
@@ -57,27 +69,9 @@ class StateTrie:
     def getRootHash(self):
         return self.state_trie.root_hash
     
-    def recoverAddress(self, hash, v, r, s) -> bool:
-        signature = keys.Signature(vrs=(v, r, s))
-        pk = signature.recover_public_key_from_msg_hash(hash)
-        return pk.to_canonical_address()
-    
-    def rebuildHash(tx: TxSerializable):
-        txns = TxSerializableNoSig(
-            tx.type,
-            tx.fee,
-            tx.sender,
-            tx.to,
-            tx.value,
-            tx.timestamp,
-            tx.data
-        )
-        return keccak(encode(txns))
-    
     def verifyTX(self, tx: TxSerializable, accSender) -> bool:
         # Verify TX signature
-        h = self.rebuildHash(tx)
-        if (self.recoverAddress(h, tx.v, tx.r, tx.s) != tx.sender):
+        if (tx.recoverAddress() != tx.sender):
             return False
         # Check account existance
         if (not tx.type == 2):
@@ -173,7 +167,7 @@ class StateTrie:
         )
         h = keccak(encode(metxns))
         # Recover sender
-        if (self.recoverAddress(h, meta.v, meta.r, meta.s) != meta.sender):
+        if (meta.recoverAddress() != meta.sender):
             return False
         # Check sender account existance
         if (not self.accountExists(meta.sender) or not self.accountExists(meta.to)):

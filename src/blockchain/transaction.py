@@ -1,10 +1,10 @@
 # Format of a transaction
-import rlp
+from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 from eth_keys import keys
 from eth_utils import keccak
 
-class TxSerializableNoSig(rlp.Serializable):
+class TxSerializableNoSig(Serializable):
     fields = [
         ('type', big_endian_int),
         ('fee', big_endian_int),
@@ -16,13 +16,13 @@ class TxSerializableNoSig(rlp.Serializable):
         ('data', binary)
     ]
 
-class FnCallArg(rlp.Serializable):
+class FnCallArg(Serializable):
     fields = [
         ('type', big_endian_int),
         ('value', binary)
     ]
 
-class TxMetaNoSig(rlp.Serializable):
+class TxMetaNoSig(Serializable):
     fields = [
         ('forwarder', big_endian_int),
         ('sender', Binary.fixed_length(20, allow_empty=False)),
@@ -31,7 +31,7 @@ class TxMetaNoSig(rlp.Serializable):
         ('sc', big_endian_int)
     ]
 
-class TxMeta(rlp.Serializable):
+class TxMeta(Serializable):
     fields = [
         ('forwarder', big_endian_int),
         ('sender', Binary.fixed_length(20, allow_empty=False)),
@@ -43,7 +43,22 @@ class TxMeta(rlp.Serializable):
         ('s', big_endian_int)
     ]
 
-class TxSerializable(rlp.Serializable):
+    def hash(self):
+        txmetans = TxMetaNoSig(
+            self.forwarder,
+            self.sender,
+            self.to,
+            self.timestamp,
+            self.sc
+        )
+        return keccak(encode(txmetans))
+    
+    def recoverAddress(self):
+        signature = keys.Signature(vrs=(self.v, self.r, self.s))
+        pk = signature.recover_public_key_from_msg_hash(self.hash())
+        return pk.to_canonical_address()
+
+class TxSerializable(Serializable):
     fields = [
         ('type', big_endian_int),
         ('fee', big_endian_int),
@@ -57,6 +72,23 @@ class TxSerializable(rlp.Serializable):
         ('r', big_endian_int),
         ('s', big_endian_int)
     ]
+
+    def hash(self):
+        txns = TxSerializableNoSig(
+            self.type,
+            self.fee,
+            self.sender,
+            self.to,
+            self.value,
+            self.timestamp,
+            self.data
+        )
+        return keccak(encode(txns))
+    
+    def recoverAddress(self):
+        signature = keys.Signature(vrs=(self.v, self.r, self.s))
+        pk = signature.recover_public_key_from_msg_hash(self.hash())
+        return pk.to_canonical_address()
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):
@@ -74,11 +106,11 @@ class Transaction():
         self.signature = None  # (v, r, s)
     
     def serializeNoSig(self):
-        return rlp.encode(TxSerializableNoSig(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data))
+        return encode(TxSerializableNoSig(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data))
         #return (to_bytes(self.nonce) + to_bytes(self.gas_price) + to_bytes(self.gas_limit) + self.to + to_bytes(self.value) + self.data)
 
     def serialize(self):
-        return rlp.encode(TxSerializable(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data, self.v, self.r, self.s))
+        return encode(TxSerializable(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data, self.v, self.r, self.s))
 
     def hashTx(self):
         tx = self.serializeNoSig()
