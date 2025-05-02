@@ -244,7 +244,7 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
-            if not self.verifyReassign():
+            if not self.verifyReassign(tx):
                 return False
         if (not execute):
             return True
