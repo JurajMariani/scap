@@ -7,7 +7,7 @@ import time
 
 from rlp import encode, decode
 from transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
-from account import AccSerializable, Endorsement, RegisterData, AffiliateMediaList
+from account import AccSerializable, Endorsement, RegisterData, AffiliateMedia, AffiliateMediaList
 
 # TODO
 # A method of AccSerializable has been added - `isConsensusNode()` and `isVerified()`
@@ -90,6 +90,7 @@ class StateTrie:
                         0,  # passive sc
                         0,  # active sc
                         0,  # effective sc
+                        b'',# validator pub key
                         [], # endorsed
                         [], # endorsed by
                         []  # soc media
@@ -107,6 +108,7 @@ class StateTrie:
                     0,  # passive sc
                     0,  # active sc
                     0,  # effective sc
+                    b'',# validator pub key
                     [], # endorsed
                     [], # endorsed by
                     []  # soc media
@@ -137,6 +139,9 @@ class StateTrie:
             accSender.passive_sc,
             accSender.active_sc,
             accSender.effective_sc,
+            accSender.validator_pub_key,
+            accSender.endorsed,
+            accSender.endorsed_by,
             accSender.soc_media
         )
         updatedRec = AccSerializable(
@@ -148,6 +153,9 @@ class StateTrie:
             accBenef.passive_sc,
             accBenef.active_sc,
             accBenef.effective_sc,
+            accSender.validator_pub_key,
+            accSender.endorsed,
+            accSender.endorsed_by,
             accBenef.soc_media
         )
         # Record changes
@@ -278,6 +286,7 @@ class StateTrie:
             scSender.passive_sc - metaTx.sc,
             scSender.active_sc,
             scSender.effective_sc,
+            scSender.validator_pub_key,
             endorsedList,
             scSender.endorsed_by,
             scSender.soc_media
@@ -313,6 +322,7 @@ class StateTrie:
             scSender.passive_sc,
             scSender.active_sc + metaTx.sc,
             scSender.effective_sc,
+            scSender.validator_pub_key,
             scBeneficiary.endorsed,
             endorsed_byList,
             scSender.soc_media
@@ -368,6 +378,7 @@ class StateTrie:
             passSc,
             0,
             0,
+            b'',
             [],
             [],
             [],
@@ -375,7 +386,25 @@ class StateTrie:
         self.updateAccount(tx.sender, accUpdated)
         return True
     
-    def findMediaInAffiliateList(self, alist: list[AffiliateMediaList], media: binary) -> int:
+    def verifyAffiliate(self, tx: TxSerializable) -> bool:
+        # Verify common TX elements
+        if (not self.verifyTX(tx)):
+            return False
+        # Verify data field
+        d = decode(tx.data, AffiliateMediaList)
+        if not d.media:
+            return False
+        if d.validator_pub_key == b'':
+            return False
+        # Verify validator_pub_key
+        # if already present in account
+        acc = self.getAccount(tx.sender)
+        if (acc.validator_pub_key):
+            if (acc.validator_pub_key != d.validator_pub_key):
+                return False
+        return True
+    
+    def findMediaInAffiliateList(self, alist: list[AffiliateMedia], media: binary) -> int:
         i = 0
         for item in alist:
             if item.media == media:
@@ -387,19 +416,20 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
-            if (not self.verifyRegister(tx)):
+            if (not self.verifyAffiliate(tx)):
                 return False
         if (not execute):
             return True
         # Recover AffiliateMediaList
-        affList = list(decode(tx.data, AffiliateMediaList))
+        affMediaList = decode(tx.data, AffiliateMediaList)
+        affList = list(affMediaList.media)
         accSender = self.getAccount(tx.sender)
         socAccs = list(accSender.soc_media)
         # Recover SocMedia list from sender
         # For each affiliation
         for aff in affList:
             # Check addition flag
-            if (aff.add_flag == b'1'):
+            if (aff.add_flag == b'\x01'):
                 # Check for duplicates
                 if (self.findMediaInAffiliateList(socAccs, aff.media) >= 0):
                     # Duplicate found
@@ -431,6 +461,7 @@ class StateTrie:
             accSender.passive_sc,
             accSender.active_sc,
             accSender.effective_sc,
+            affList.validator_pub_key,
             accSender.endorsed,
             accSender.endorsed_by,
             socAccs
