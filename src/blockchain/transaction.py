@@ -116,6 +116,10 @@ class TxSerializable(Serializable):
     
     def verifySig(self) -> bool:
         return self.recoverAddress() == self.sender
+    
+    def getFeasibilityMetric(self) -> float:
+        txBytes = len(encode(self))
+        return self.fee / txBytes
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):
