@@ -1,3 +1,4 @@
+from eth_utils import keccak
 import random
 import time
 
@@ -10,8 +11,9 @@ class Randao:
         return self.seed
     
     def reseed(self, seed: bytes) -> None:
-        self.seed = seed
-        self.rng.seed(seed)
+        # Process: new_randao_seed = h(prev_seed XOR h(reveal))
+        self.seed = keccak(self.seed ^ keccak(seed))
+        self.rng.seed(self.seed)
 
     def getValue(self) -> float:
         return self.rng.random()
