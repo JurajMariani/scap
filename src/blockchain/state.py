@@ -92,20 +92,7 @@ class StateTrie:
         benef = self.getAccount(beneficiary)
         if not benef:
             return False
-        benefEnriched = AccSerializable(
-            benef.nonce,
-            benef.forwarder,
-            benef.balance + value,
-            benef.id_hash,
-            benef.vc_zkp,
-            benef.passive_sc,
-            benef.active_sc,
-            benef.effective_sc,
-            benef.validator_pub_key,
-            benef.endorsed,
-            benef.endorsed_by,
-            benef.soc_media
-        )
+        benefEnriched = benef.update(balance=(benef.balance + value))
         self.updateAccount(beneficiary, benefEnriched)
         return True
     
@@ -121,40 +108,17 @@ class StateTrie:
             if (tx.type == 0):
                 if (not self.accountExists(tx.to)):
                     # Create beneficiary account
-                    self.addAccount(AccSerializable(
-                        0,  # nonce
-                        0,  # forwarder
-                        0,  # balance
-                        b'',# id hash
-                        b'',# vc zkp
-                        0,  # passive sc
-                        0,  # active sc
-                        0,  # effective sc
-                        b'',# validator pub key
-                        [], # endorsed
-                        [], # endorsed by
-                        []  # soc media
-                    ), tx.to)
+                    self.addAccount(AccSerializable().blank(), tx.to)
         else:
             # Register type TX can crate SENDER account
             if (not self.getAccount(tx.sender)):
                 # Create blank sender
-                self.addAccount(AccSerializable(
-                    0,  # nonce
-                    0,  # forwarder
-                    0,  # balance
-                    b'',# id hash
-                    b'',# vc zkp
-                    0,  # passive sc
-                    0,  # active sc
-                    0,  # effective sc
-                    b'',# validator pub key
-                    [], # endorsed
-                    [], # endorsed by
-                    []  # soc media
-                ),tx.sender)
+                self.addAccount(AccSerializable().blank(), tx.sender)
         # Check transaction & user nonces
         if (accSender.nonce != tx.nonce):
+            return False
+        # Check values are not negative
+        if (tx.fee < 0 or tx.value < 0):
             return False
         return True
 
@@ -170,34 +134,8 @@ class StateTrie:
         accSender = self.getAccount(tx.sender)
         accBenef = self.getAccount(tx.to)
         # Initiate swap
-        updatedSender = AccSerializable(
-            accSender.nonce + 1,
-            accSender.forwarder,
-            accSender.balance - tx.value - tx.fee,
-            accSender.id_hash,
-            accSender.vc_zkp,
-            accSender.passive_sc,
-            accSender.active_sc,
-            accSender.effective_sc,
-            accSender.validator_pub_key,
-            accSender.endorsed,
-            accSender.endorsed_by,
-            accSender.soc_media
-        )
-        updatedRec = AccSerializable(
-            accBenef.nonce,
-            accBenef.forwarder,
-            accBenef.balance + tx.value,
-            accBenef.id_hash,
-            accBenef.vc_zkp,
-            accBenef.passive_sc,
-            accBenef.active_sc,
-            accBenef.effective_sc,
-            accSender.validator_pub_key,
-            accSender.endorsed,
-            accSender.endorsed_by,
-            accBenef.soc_media
-        )
+        updatedSender = accSender.update(nonce=True, balance=(accSender.balance - tx.value - tx.fee))
+        updatedRec = accBenef.update(balance=(accBenef.balance + tx.value))
         # Record changes
         self.updateAccount(tx.sender, updatedSender)
         self.updateAccount(tx.to, updatedRec)
@@ -318,22 +256,9 @@ class StateTrie:
                 item = endorsedList[idx]
                 endorsedList[idx] = Endorsement(item.address, item.value + metaTx.sc)
         else:
-            return
+            return False
         # Move sc from metaTX sender, register endorsement
-        scSenderUpdate = AccSerializable(
-            scSender.nonce,
-            scSender.forwarder + 1,
-            scSender.balance,
-            scSender.id_hash,
-            scSender.vc_zkp,
-            scSender.passive_sc - metaTx.sc,
-            scSender.active_sc,
-            scSender.effective_sc,
-            scSender.validator_pub_key,
-            endorsedList,
-            scSender.endorsed_by,
-            scSender.soc_media
-        )
+        scSenderUpdate = scSender.update(forwarder=True, passive_sc=(scSender.passive_sc - metaTx.sc), endorsed=endorsedList)
         # Add sc to receiver, register endorsement
         endorsed_byList = list(scSender.endorsed_by)
         idx = self.findAddrInEndorsementList(endorsed_byList, metaTx.sender)
@@ -355,21 +280,9 @@ class StateTrie:
                 item = endorsed_byList[idx]
                 endorsed_byList[idx] = Endorsement(item.address, item.value + metaTx.sc)
         else:
-            return
-        scBeneficiaryUpdate = AccSerializable(
-            scSender.nonce + 1,
-            scSender.forwarder,
-            scSender.balance,
-            scSender.id_hash,
-            scSender.vc_zkp,
-            scSender.passive_sc,
-            scSender.active_sc + metaTx.sc,
-            scSender.effective_sc,
-            scSender.validator_pub_key,
-            scBeneficiary.endorsed,
-            endorsed_byList,
-            scSender.soc_media
-        )
+            return False
+        
+        scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList)
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)
