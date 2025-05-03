@@ -165,7 +165,7 @@ class TxSerializable(Serializable):
         return self.fee / txBytes
     
     def update(
-        self, nonce: bool = False, type: int | bool = False,
+        self, nonce: bool = False, type: int | None = None,
         fee: int | None = None, sender: bytes | None = None,
         to: bytes | None = None, value : int | None = None,
         timestamp: int | None = None, data: bytes | None = None,
