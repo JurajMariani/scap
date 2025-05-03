@@ -54,6 +54,23 @@ class TxMetaNoSig(Serializable):
         ('sc', big_endian_int)
     ]
 
+    def hash(self) -> bytes:
+        return keccak(encode(self))
+    
+    def sign(self, privK: bytes) -> TxMeta:
+        sk = keys.PrivateKey(privK)
+        sig = sk.sign_msg_hash(self.hash())
+        return TxSerializable(
+            self.forwarder,
+            self.sender,
+            self.to,
+            self.timestamp,
+            self.sc,
+            sig.v,
+            sig.r,
+            sig.s
+        )
+
 class TxMeta(Serializable):
     fields = [
         ('forwarder', big_endian_int),
@@ -74,7 +91,7 @@ class TxMeta(Serializable):
             self.timestamp,
             self.sc
         )
-        return keccak(encode(txmetans))
+        return txmetans.hash()
     
     def recoverAddress(self):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))

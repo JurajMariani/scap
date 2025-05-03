@@ -143,16 +143,6 @@ class StateTrie:
 
     def verifyMetaTX(self, meta: TxMeta) -> bool:
         # Verify signature
-        # Rebuild hash
-        metxns = TxMetaNoSig(
-            meta.forwarder,
-            meta.sender,
-            meta.to,
-            meta.fnCall,
-            meta.args
-        )
-        h = keccak(encode(metxns))
-        # Recover sender
         if not meta.verifySig():
             return False
         # Check sender account existance
