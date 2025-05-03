@@ -7,6 +7,7 @@ from __future__ import annotations
 
 class TxSerializableNoSig(Serializable):
     fields = [
+        ('nonce', big_endian_int),
         ('type', big_endian_int),
         ('fee', big_endian_int),
         #('gas_limit', big_endian_int),
@@ -24,6 +25,7 @@ class TxSerializableNoSig(Serializable):
         sk = keys.PrivateKey(privK)
         sig = sk.sign_msg_hash(self.hash())
         return TxSerializable(
+            self.nonce,
             self.type,
             self.fee,
             self.sender,
@@ -84,6 +86,7 @@ class TxMeta(Serializable):
 
 class TxSerializable(Serializable):
     fields = [
+        ('nonce', big_endian_int),
         ('type', big_endian_int),
         ('fee', big_endian_int),
         #('gas_limit', big_endian_int),
@@ -99,6 +102,7 @@ class TxSerializable(Serializable):
 
     def hash(self):
         txns = TxSerializableNoSig(
+            self.nonce,
             self.type,
             self.fee,
             self.sender,
