@@ -72,6 +72,9 @@ class PoSC:
     def attest(self, state: StateTrie, parentHash: bytes, parentBNumber: int, cRew: int, bl: BlockSerializable) -> tuple[StateTrie, bool]:
         # Maybe redundant
         self.proposedBlock = bl
+        # Beneficiary must match current leader
+        if self.getLeader() != bl.beneficiary:
+            return (state, False)
         # Validate block
         return bl.verifyBlock(state, parentHash, parentBNumber, cRew)
         
