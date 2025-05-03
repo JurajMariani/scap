@@ -62,7 +62,7 @@ class BlockSerializable(Serializable):
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
-        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestations_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
@@ -101,9 +101,9 @@ class BlockSerializable(Serializable):
         )
         return keccak(encode(blockns))
     
-    def calculateTxHash(self) -> bytes:
+    def calculateListHash(self, llist: list) -> bytes:
         hashlist = []
-        for tx in self.transactions:
+        for tx in llist:
             hashlist.append(tx.hash())
         i = 0
         while (i < len(hashlist)):
@@ -155,7 +155,7 @@ class BlockSerializable(Serializable):
         if (not self.verifyRandao(benef.validator_pub_key)):
             return (state, False)
         # Verify TX root
-        if (self.transactions_root != self.calculateTxHash()):
+        if (self.transactions_root != self.calculateListHash(self.transactions)):
             return (state, False)
         # Verify Transactions
         if (not self.verifyTXs(state)):
@@ -168,6 +168,9 @@ class BlockSerializable(Serializable):
             return (state, False)
         # Verify prev. block attestations
         if not self.verifyAttestations(state):
+            return (state, False)
+        # Verify attestation root hash
+        if (self.attestations_root != self.calculateListHash(self.attestations)):
             return (state, False)
         # Verify state root validity
         return self.verifyStateAfterExecution(state, currReward)
@@ -244,7 +247,7 @@ class BlockNoSig(Serializable):
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
-        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestations_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
@@ -263,7 +266,7 @@ class BlockSig(Serializable):
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
-        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestations_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
