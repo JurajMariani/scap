@@ -4,17 +4,65 @@ from eth_keys import keys
 from eth_utils import keccak
 from trie import HexaryTrie
 from copy import deepcopy
+from __future__ import annotations
 
 from transaction import Transaction, TxSerializable
 from state import StateTrie
 import json
 import blst
 
+class AttestationNoSig(Serializable):
+    fields = [
+        ('sender', Binary.fixed_length(20, allow_empty=False)),
+        ('block_hash', Binary.fixed_length(32, allow_empty=False)),
+        ('verdict', Binary.fixed_length(1, allow_empty=False))
+    ]
+
+    def hash(self) -> bytes:
+        return keccak(encode(self))
+    
+    def sign(self, privK: bytes) -> Attestation:
+        sk = keys.PrivateKey(privK)
+        sig = sk.sign_msg_hash(self.hash())
+        return Attestation(
+            self.sender,
+            self.block_hash,
+            self.verdict,
+            sig.v,
+            sig.r,
+            sig.s
+        )
+
+class Attestation(Serializable):
+    fields = [
+        ('sender', Binary.fixed_length(20, allow_empty=False)),
+        ('block_hash', Binary.fixed_length(32, allow_empty=False)),
+        ('verdict', Binary.fixed_length(1, allow_empty=False)),
+        ('v', big_endian_int),
+        ('r', big_endian_int),
+        ('s', big_endian_int)
+    ]
+
+    def hash(self) -> bytes:
+        atns = AttestationNoSig(
+            self.sender,
+            self.block_hash,
+            self.verdict
+        )
+        return atns.hash()
+
+    def recoverAddress(self) -> bytes:
+        signature = keys.Signature(vrs=(self.v, self.r, self.s))
+        pk = signature.recover_public_key_from_msg_hash(self.hash())
+        return pk.to_canonical_address()
+
+
 class BlockSerializable(Serializable):
     fields = [
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
@@ -22,13 +70,15 @@ class BlockSerializable(Serializable):
         # We ignore epoch_no to simplify implementation
         # therefore, sign keccak(block_no + domain_randao)
         ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
         ('sig_r', big_endian_int),
         ('sig_s', big_endian_int),
         ('data', binary),
-        ('transactions', CountableList(TxSerializable))
+        ('transactions', CountableList(TxSerializable)),
+        ('attestations', CountableList(Attestation))
     ]
 
     def recoverAddress(self):
@@ -116,6 +166,9 @@ class BlockSerializable(Serializable):
         # Verify block number
         if (not self.block_number != parentBlockNo + 1):
             return (state, False)
+        # Verify prev. block attestations
+        if not self.verifyAttestations(state):
+            return (state, False)
         # Verify state root validity
         return self.verifyStateAfterExecution(state, currReward)
 
@@ -158,21 +211,51 @@ class BlockSerializable(Serializable):
         # 6. IF MATCHING ROOTHASH
         #   7. Apply Changes (new final state is tmp)
         return (tmp, True)
+    
+    def verifyAttestations(self, state: StateTrie) -> bool:
+        # Verify a supermajority attested
+        if (len(self.attestations) < state.getValidatorSupermajorityLen()):
+            return False
+        positiveVerdicts = 0
+        for att in self.attestations:
+            # -- Verify attestation validity --
+            # Verify sender is in validator list
+            if not state.getValidator(att.sender):
+                return False
+            # Verify block_hash == parent_hash
+            if att.block_hash != self.parent_hash:
+                return False
+            # Count positive verdicts
+            if att.verdict == b'\x01':
+                positiveVerdicts += 1
+            # Verify verifier signature
+            sig = keys.Signature(vrs=(att.v, att.r, att.s))
+            pk = sig.recover_public_key_from_msg_hash(att.block_hash)
+            if pk.to_canonical_address() != att.sender:
+                return False
+        # Verify positive attestation count
+        if positiveVerdicts < state.getValidatorSupermajorityLen():
+            return False
+        return True
+            
 
 class BlockNoSig(Serializable):
     fields = [
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
         ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         #('signature', Binary.fixed_length(65, allow_empty=False)),
         ('data', binary),
         #('transactions', CountableList(Transaction))
+        #('attestations', CountableList(Attestation))
     ]
 
 class BlockSig(Serializable):
@@ -180,10 +263,12 @@ class BlockSig(Serializable):
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
         ('transactions_root', Binary.fixed_length(32, allow_empty=False)),
+        ('attestation_root', Binary.fixed_length(32, allow_empty=False)),
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
         ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
@@ -191,6 +276,7 @@ class BlockSig(Serializable):
         ('sig_s', big_endian_int),
         ('data', binary),
         #('transactions', CountableList(Transaction))
+        #('attestations', CountableList(Attestation))
     ]
 
 class Block():

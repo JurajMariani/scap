@@ -78,6 +78,12 @@ class StateTrie:
 
     def getValidators(self) -> dict[bytes, int]:
         return self.valAddrList
+    
+    def getValidatorLen(self) -> int:
+        return len(self.valAddrList)
+    
+    def getValidatorSupermajorityLen(self) -> int:
+        return (self.getValidatorLen() // 3) * 2
 
     def getRootHash(self):
         return self.state_trie.root_hash

@@ -3,18 +3,39 @@ from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 from eth_keys import keys
 from eth_utils import keccak
+from __future__ import annotations
 
 class TxSerializableNoSig(Serializable):
     fields = [
         ('type', big_endian_int),
         ('fee', big_endian_int),
         #('gas_limit', big_endian_int),
-        ('sender', Binary.fixed_length(20, allow_empty=False))
+        ('sender', Binary.fixed_length(20, allow_empty=False)),
         ('to', Binary.fixed_length(20, allow_empty=True)),
         ('value', big_endian_int),
         ('timestamp', big_endian_int),
         ('data', binary)
     ]
+
+    def hash(self) -> bytes:
+        return keccak(encode(self))
+    
+    def sign(self, privK: bytes) -> TxSerializable:
+        sk = keys.PrivateKey(privK)
+        sig = sk.sign_msg_hash(self.hash())
+        return TxSerializable(
+            self.type,
+            self.fee,
+            self.sender,
+            self.to,
+            self.value,
+            self.timestamp,
+            self.data,
+            sig.v,
+            sig.r,
+            sig.s
+        )
+
 
 class FnCallArg(Serializable):
     fields = [
@@ -63,7 +84,7 @@ class TxSerializable(Serializable):
         ('type', big_endian_int),
         ('fee', big_endian_int),
         #('gas_limit', big_endian_int),
-        ('sender', Binary.fixed_length(20, allow_empty=False))
+        ('sender', Binary.fixed_length(20, allow_empty=False)),
         ('to', Binary.fixed_length(20, allow_empty=True)),
         ('value', big_endian_int),
         ('timestamp', big_endian_int),
@@ -83,7 +104,7 @@ class TxSerializable(Serializable):
             self.timestamp,
             self.data
         )
-        return keccak(encode(txns))
+        return txns.hash()
     
     def recoverAddress(self):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))

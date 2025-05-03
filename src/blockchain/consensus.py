@@ -3,6 +3,8 @@ from math import sqrt, log2, log10
 import json
 
 from state import StateTrie
+from block import Attestation, AttestationNoSig, BlockSerializable
+from account import AccSerializable
 from randao import Randao
 
 class PoSC:
@@ -10,6 +12,8 @@ class PoSC:
         self.validators: dict[bytes, int] = {}
         self.randao = Randao()
         self.leader: bytes | None = None
+        self.attestations: list[Attestation] = []
+        self.proposedBlock: BlockSerializable | None = None
 
     def updateValidatorList(self, state: StateTrie) -> bool:
         scalingFn = ''
@@ -65,5 +69,9 @@ class PoSC:
     def getLeader(self) -> bytes | None:
         return self.leader
 
-    def attestate():
-        pass
+    def attest(self, state: StateTrie, parentHash: bytes, parentBNumber: int, cRew: int, bl: BlockSerializable) -> tuple[StateTrie, bool]:
+        # Maybe redundant
+        self.proposedBlock = bl
+        # Validate block
+        return bl.verifyBlock(state, parentHash, parentBNumber, cRew)
+        
