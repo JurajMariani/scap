@@ -78,6 +78,9 @@ class TxMeta(Serializable):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
         return pk.to_canonical_address()
+    
+    def verifySig(self) -> bool:
+        return self.recoverAddress() == self.sender
 
 class TxSerializable(Serializable):
     fields = [
@@ -110,6 +113,9 @@ class TxSerializable(Serializable):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
         return pk.to_canonical_address()
+    
+    def verifySig(self) -> bool:
+        return self.recoverAddress() == self.sender
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):

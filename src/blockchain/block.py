@@ -55,6 +55,9 @@ class Attestation(Serializable):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
         return pk.to_canonical_address()
+    
+    def verifySig(self) -> bool:
+        return self.recoverAddress() == self.sender
 
 
 class BlockSerializable(Serializable):

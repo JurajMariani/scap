@@ -111,7 +111,7 @@ class StateTrie:
     
     def verifyTX(self, tx: TxSerializable, accSender) -> bool:
         # Verify TX signature
-        if (tx.recoverAddress() != tx.sender):
+        if not tx.verifySig():
             return False
         # Check account existance
         if (not tx.type == 2):
@@ -215,7 +215,7 @@ class StateTrie:
         )
         h = keccak(encode(metxns))
         # Recover sender
-        if (meta.recoverAddress() != meta.sender):
+        if not meta.verifySig():
             return False
         # Check sender account existance
         if (not self.accountExists(meta.sender) or not self.accountExists(meta.to)):
