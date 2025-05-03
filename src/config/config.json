@@ -13,6 +13,10 @@
     "constraints": {
         "tx_limit": 10
     },
+    "consensus": {
+        "slashing_multiplier": 0.2,
+        "timeout_time": 30
+    },
     "network": {
         "port": "8400",
         "endpoints": {
