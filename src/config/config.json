@@ -11,7 +11,8 @@
         "scaling": "log"
     },
     "constraints": {
-        "tx_limit": 10
+        "tx_limit": 10,
+        "replacement_tx_fee_multiplier": 5
     },
     "consensus": {
         "slashing_multiplier": 0.2,
