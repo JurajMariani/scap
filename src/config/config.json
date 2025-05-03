@@ -1,8 +1,17 @@
 {
+    "currency": {
+        "supply": 50000000,
+        "halving_interval": 500000,
+        "unit_scap": 1e14,
+        "initial_reward": 50e14
+    },
     "sc_constants": {
         "def_passive_sc": 10,
         "domain_randao": 33554432,
         "scaling": "log"
+    },
+    "constraints": {
+        "tx_limit": 10
     },
     "network": {
         "port": "8400",
