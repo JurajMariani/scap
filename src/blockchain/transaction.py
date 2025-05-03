@@ -104,6 +104,11 @@ class TxMeta(Serializable):
 class TxSerializable(Serializable):
     fields = [
         ('nonce', big_endian_int),
+        # 0 -> normal
+        # 1 -> scap assignment
+        # 2 -> registration
+        # 3 -> soc media registration
+        # 4 -> replacement (upon recv, node changes type based on orig tx)
         ('type', big_endian_int),
         ('fee', big_endian_int),
         #('gas_limit', big_endian_int),
@@ -130,6 +135,23 @@ class TxSerializable(Serializable):
         )
         return txns.hash()
     
+    def sign(self, privK: bytes) -> TxSerializable:
+        sk = keys.PrivateKey(privK)
+        sig = sk.sign_msg_hash(self.hash())
+        return TxSerializable(
+            self.nonce,
+            self.type,
+            self.fee,
+            self.sender,
+            self.to,
+            self.value,
+            self.timestamp,
+            self.data,
+            sig.v,
+            sig.r,
+            sig.s
+        )
+    
     def recoverAddress(self):
         signature = keys.Signature(vrs=(self.v, self.r, self.s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
@@ -141,13 +163,34 @@ class TxSerializable(Serializable):
     def getFeasibilityMetric(self) -> float:
         txBytes = len(encode(self))
         return self.fee / txBytes
+    
+    def update(
+        self, nonce: bool = False, type: int | bool = False,
+        fee: int | None = None, sender: bytes | None = None,
+        to: bytes | None = None, value : int | None = None,
+        timestamp: int | None = None, data: bytes | None = None,
+        v: int | None = None, r: int | None = None, s: int | None = None 
+    ) -> TxSerializable:
+        return TxSerializable(
+            self.nonce + 1 if nonce else self.nonce,
+            type if not None else self.type,
+            fee if not None else self.fee,
+            sender if not None else self.sender,
+            to if not None else self.to,
+            value if not None else self.value,
+            timestamp if not None else self.timestamp,
+            data if not None else self.data,
+            v if not None else self.v,
+            r if not None else self.r,
+            s if not None else self.s
+        )
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):
         self.sender = sender
         self.to = to
         self.value = value
-        self.type = type # 0 -> normal, 1 -> scap assignment, 2 -> registration
+        self.type = type 
         self.gas_limit = gas_limit
         self.gas_price = gas_price
         self.data = data

@@ -59,40 +59,41 @@ class AccSerializable(Serializable):
     
     def update(
         self, nonce: bool = False, forwarder: bool = False,
-        balance: int = 0, id_hash: bytes = b'', vc_zkp: bytes = b'',
-        passive_sc: int = 0, active_sc: int = 0, effective_sc: int = 0,
-        validator_pub_key: bytes = b'', endorsed: list[Endorsement] = [],
-        endorsed_by: list[Endorsement] = [], soc_media: list[AffiliateMedia] = []
+        balance: int | None = None, id_hash: bytes | None = None,
+        vc_zkp: bytes | None = None, passive_sc: int | None = None,
+        active_sc: int | None = None, effective_sc: int | None = None,
+        validator_pub_key: bytes | None = None, endorsed: list[Endorsement] | None = None,
+        endorsed_by: list[Endorsement] | None = None, soc_media: list[AffiliateMedia] | None = None
     ) -> AccSerializable:
         return AccSerializable(
             self.nonce + 1 if nonce else self.nonce,
             self.forwarder + 1 if forwarder else self.forwarder,
-            balance if balance else self.balance,
-            id_hash if id_hash else self.id_hash,
-            vc_zkp if vc_zkp else self.vc_zkp,
-            passive_sc if passive_sc else self.passive_sc,
-            active_sc if active_sc else self.active_sc,
-            effective_sc if effective_sc else self.effective_sc,
-            validator_pub_key if validator_pub_key else self.validator_pub_key,
-            endorsed if endorsed else self.endorsed,
-            endorsed_by if endorsed_by else self.endorsed_by,
-            soc_media if soc_media else self.soc_media
+            balance if not None else self.balance,
+            id_hash if not None else self.id_hash,
+            vc_zkp if not None else self.vc_zkp,
+            passive_sc if not None else self.passive_sc,
+            active_sc if not None else self.active_sc,
+            effective_sc if not None else self.effective_sc,
+            validator_pub_key if not None else self.validator_pub_key,
+            endorsed if not None else self.endorsed,
+            endorsed_by if not None else self.endorsed_by,
+            soc_media if not None else self.soc_media
         )
     
     def blank(self) -> AccSerializable:
         return AccSerializable(
-            0,  # nonce
-            0,  # forwarder
-            0,  # balance
-            b'',# id hash
-            b'',# vc zkp
-            0,  # passive sc
-            0,  # active sc
-            0,  # effective sc
-            b'',# validator pub key
-            [], # endorsed
-            [], # endorsed by
-            []  # soc media
+            0,              # nonce
+            0,              # forwarder
+            0,              # balance
+            b'\x00' * 32,   # id hash
+            b'\x00' * 288,  # vc zkp
+            0,              # passive sc
+            0,              # active sc
+            0,              # effective sc
+            b'\x00' * 48,   # validator pub key
+            [],             # endorsed
+            [],             # endorsed by
+            []              # soc media
         )
 
 class Account():
