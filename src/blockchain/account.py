@@ -1,7 +1,6 @@
-
+from __future__ import annotations
 from rlp import encode, decode, Serializable
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
-from __future__ import annotations
 
 class AffiliateMedia(Serializable):
     fields = [

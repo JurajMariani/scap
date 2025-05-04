@@ -1,9 +1,10 @@
 # Format of a transaction
+from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 from eth_keys import keys
 from eth_utils import keccak
-from __future__ import annotations
+
 
 class TxSerializableNoSig(Serializable):
     fields = [

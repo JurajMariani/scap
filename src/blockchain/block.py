@@ -1,10 +1,10 @@
+from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 from eth_keys import keys
 from eth_utils import keccak
 from trie import HexaryTrie
 from copy import deepcopy
-from __future__ import annotations
 
 from transaction import Transaction, TxSerializable
 from state import StateTrie
