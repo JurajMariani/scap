@@ -1,11 +1,11 @@
 import asyncio
 from uuid import uuid4
-import time
 import json
 from collections import deque
 from peer import Peer, Message, MessageHeader
 from rlp import decode
 from middleware.rpc import RPC
+from middleware.middleware import Postman
 
 # MSG:
 # {
@@ -18,7 +18,7 @@ from middleware.rpc import RPC
 # }
 
 class Node:
-    def __init__(self, host: str, port: int, bstrapPeers: set[Peer]):
+    def __init__(self, bridge: Postman, host: str, port: int, bstrapPeers: set[Peer]):
         self.node = Peer.create(str(uuid4()), host, port)
         self.peers: set[Peer] = bstrapPeers
         self.server = None
@@ -26,12 +26,28 @@ class Node:
             self.config = json.load(f)
         self.recent_messages = deque(maxlen=self.config['network']['max_messages_kept'])
         self.message_set = set()
+        self.middleware: Postman = bridge
 
-    async def start(self):
+    async def run(self):
+        asyncio.create_task(self.listenToBlockchain())
+        await self.startServer()
+
+    async def startServer(self):
         self.server = await asyncio.start_server(self.handleConnection, self.node.host, self.node.port)
         print(f"Node listening on {self.node.host}:{self.node.port}")
         await self.connectToBootstrapPeers()
         await self.server.serve_forever()
+
+    async def listenToBlockchain(self):
+        while True:
+            msg = self.middleware.recv()
+            if msg:
+                print(f"[{self.node.getId()}][P2P] Got message from blockchain: {msg}")
+                await self.send(msg, '')
+            await asyncio.sleep(0.1)
+
+    async def start(self):
+        asyncio.run(self.run())
 
     async def connectToBootstrapPeers(self):
         for peer in self.peers.copy():
@@ -89,13 +105,18 @@ class Node:
 
         # Categorize based on type
         msgType = msg.get('type')
-        msgSubType = msg.get('subtype')
-        if (msgType == "PeerHello"):
+        # Subtype serves no purpose fo far
+        # msgSubType = msg.get('subtype')
+        if msgType == "PeerHello":
             await self.sendMessage(self.getPeerOlleh(), decode(msg.get('sender')))
+        elif msgType == "PeerOlleh":
+            return
         else:
-            pass
-
-        await self.sendMessage(msg, exclude=[self.node])
+            # Synchornization logic
+            # 1. Flood message
+            await self.sendMessage(msg, exclude=[self.node])
+            # 2. Execute message
+            self.middleware.send(msg.payload)
 
     def hasSeen(self, msg_id):
         return msg_id in self.message_set

@@ -68,6 +68,11 @@ def fit_X(val: str | bytes | None, x: int = 16) -> bytes:
     if isinstance(val, str):
         val = val.encode('ascii')
     return val[:x].ljust(x, b'\x00')
+
+def to_int(val: bytes | None) -> int:
+    if val is None:
+        return 0
+    return int.from_bytes(val, byteorder='big')
     
 
 class MessageHeader(Serializable):
