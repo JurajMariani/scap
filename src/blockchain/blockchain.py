@@ -1,17 +1,20 @@
-from block import BlockSerializable, BlockSig, BlockNoSig, Attestation, AttestationNoSig
+from block import BlockSerializable, BlockNoSig, Attestation, AttestationNoSig
 from transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
 from state import StateTrie
 from account import AccSerializable, RegisterData, AffiliateMediaList, AffiliateMedia
 from consensus import PoSC
+from middleware.middleware import Postman
+from middleware.rpc import RPC
 from eth_keys import keccak
 from rlp import encode
+import asyncio
 import json
 import time
 import blst
 
 
 class Blockchain:
-    def __init__(self):
+    def __init__(self, bridge: Postman):
         self.chain: BlockSerializable = BlockSerializable()
         self.newBlock: BlockSerializable | None = None
         self.blockFile = None
@@ -24,6 +27,7 @@ class Blockchain:
         self.slashingList = []
         self.secretKey: bytes = b''
         self.blsKey: bytes = b''
+        self.middleware: Postman = bridge
         with open('../config/config.json') as f:
             self.config = json.load(f)
 
@@ -226,17 +230,11 @@ class Blockchain:
                 if txl.sender == tx.sender and txl.nonce == tx.nonce:
                     if tx.fee >= max(1, (txl.fee * self.config['constrants']['replacement_tx_fee_multiplier'])):
                         txn = TxSerializable(
-                            tx.nonce,
-                            txl.type,
-                            tx.fee,
-                            tx.sender,
-                            tx.to,
-                            tx.value,
-                            tx.timestamp,
-                            tx.data,
-                            tx.v,
-                            tx.r,
-                            tx.s
+                            tx.nonce, txl.type,
+                            tx.fee, tx.sender,
+                            tx.to, tx.value,
+                            tx.timestamp, tx.data,
+                            tx.v, tx.r, tx.s
                         )
                         self.mempool.remove(txl)
                         break
@@ -276,6 +274,40 @@ class Blockchain:
     
     def recvConsensusBlock(self):
         pass
+    
+    def start(self):
+        asyncio.run(self.run())
 
-    def gameplayLoop() -> bool:
+    def run(self):
+        asyncio.create_task(self.listenToNetwork())
+        self.gameplayLoop()
+
+    def listenToNetwork(self):
+        while True:
+            msg = self.bridge.recv()
+            if msg:
+                print(f"[BC] Got from P2P: {msg}")
+                # Validate / act on msg
+                response = b"Validated block"
+                self.bridge.send(response)
+            time.sleep(0.1)
+
+    def constructRPC(self, func, params) -> RPC:
         pass
+
+    def handleRPC(self, msg: RPC):
+        pass
+
+    def gameplayLoop(self):
+        while True:
+            # Repeat indefinitely
+            self.cProt.selectLeader()
+            if self.cProt.getLeader() == self.address:
+                b = self.generateBlock()
+                if b is not None:
+                    self.constructRPC(self.recvBlock, b)
+            else:
+                while self.newBlock is None:
+                    asyncio.sleep(0.1)
+                
+            pass
