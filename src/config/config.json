@@ -22,6 +22,8 @@
         "port": "8400",
         "endpoints": {
             "add_validator": "/saf..."
-        }
+        },
+        "max_messages_kept": 10000,
+        "max_peers": 10
     }
 }
