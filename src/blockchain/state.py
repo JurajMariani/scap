@@ -84,6 +84,9 @@ class StateTrie:
     
     def getValidatorSupermajorityLen(self) -> int:
         return (self.getValidatorLen() // 3) * 2
+    
+    def getValidatorSupermajorityLenInverted(self) -> int:
+        return self.getValidatorLen() - self.getValidatorSupermajorityLen()
 
     def getRootHash(self):
         return self.state_trie.root_hash

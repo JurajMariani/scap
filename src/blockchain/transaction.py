@@ -101,6 +101,13 @@ class TxMeta(Serializable):
     
     def verifySig(self) -> bool:
         return self.recoverAddress() == self.sender
+    
+    def serialize(self) -> bytes:
+        return encode(self)
+    
+    @classmethod
+    def deserialize(cls, txm) -> TxMeta:
+        return decode(txm, TxMeta)
 
 class TxSerializable(Serializable):
     fields = [
@@ -185,6 +192,13 @@ class TxSerializable(Serializable):
             r if not None else self.r,
             s if not None else self.s
         )
+    
+    def serialize(self) -> bytes:
+        return encode(self)
+    
+    @classmethod
+    def deserialize(cls, tx) -> TxSerializable:
+        return decode(tx, TxSerializable)
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):

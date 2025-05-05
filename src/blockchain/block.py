@@ -59,6 +59,16 @@ class Attestation(Serializable):
     def verifySig(self) -> bool:
         return self.recoverAddress() == self.sender
     
+    def serialize(self) -> bytes:
+        return encode(self)
+    
+    def verdict(self) -> bool:
+        return self.verdict == '\x01'
+
+    @classmethod
+    def deserialize(cls, att) -> Attestation:
+        return decode(att, Attestation)
+    
 
 class BlockNoSig(Serializable):
     fields = [
@@ -356,7 +366,7 @@ class BlockSerializable(Serializable):
             if att.block_hash != self.parent_hash:
                 return False
             # Count positive verdicts
-            if att.verdict == b'\x01':
+            if att.verdict():
                 positiveVerdicts += 1
             # Verify verifier signature
             sig = keys.Signature(vrs=(att.v, att.r, att.s))
@@ -367,6 +377,13 @@ class BlockSerializable(Serializable):
         if positiveVerdicts < state.getValidatorSupermajorityLen():
             return False
         return True
+    
+    def serialize(self) -> bytes:
+        return encode(self)
+    
+    @classmethod
+    def deserialize(cls, bl: bytes) -> BlockSerializable:
+        return decode(bl, BlockSerializable)
 
 
 class Block():
