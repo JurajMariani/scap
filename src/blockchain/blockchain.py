@@ -4,7 +4,8 @@ from state import StateTrie
 from account import AccSerializable, RegisterData, AffiliateMediaList, AffiliateMedia
 from consensus import PoSC
 from middleware.middleware import Postman
-from middleware.rpc import RPC
+from middleware.rpc import RPC, Param
+from node.peer import Message, MessageHeader
 from eth_keys import keccak
 from rlp import encode
 import asyncio
@@ -14,25 +15,32 @@ import blst
 
 
 class Blockchain:
-    def __init__(self, bridge: Postman):
+    def __init__(self, bridge: Postman, acc: AccSerializable | None, address: bytes, skey: bytes):
         self.chain: BlockSerializable = BlockSerializable()
         self.newBlock: BlockSerializable | None = None
         self.blockFile = None
         self.cProt = PoSC()
         self.state = StateTrie()
-        self.account: AccSerializable | None = None
-        self.address: bytes | None = None
+        self.account: AccSerializable | None = acc
+        self.address: bytes = address
         self.attestationList: list[Attestation] = []
+        self.newAttestationList: list[Attestation] = []
         self.mempool: list[TxSerializable] = []
         self.slashingList = []
-        self.secretKey: bytes = b''
+        self.secretKey: bytes = skey
         self.blsKey: bytes = b''
         self.middleware: Postman = bridge
         with open('../config/config.json') as f:
             self.config = json.load(f)
 
-    def setAccount(self, acc: AccSerializable) -> None:
+    def setAccount(self, acc: AccSerializable, add: bytes, skey: bytes) -> None:
         self.account = acc
+        self.address = add
+        self.secretKey = skeys
+
+    # Store current block to file
+    def store(self):
+        pass
 
     def getPastBlock(self, idx) -> BlockSerializable | None:
         pass
@@ -66,10 +74,42 @@ class Blockchain:
                 self.slash(at.sender)
                 return
         # If Attestation is correct, add it to list
-        self.attestationList.append(at)
+        self.newAttestationList.append(at)
+
+        # Calculate the number of positive attestations
+        positive = 0
+        for att in self.newAttestationList:
+            if att.verdict():
+                positive += 1
+        
+        negative = len(self.newAttestationList) - positive
+        more = max(positive, negative)
+        # If consensus cannot be reached
+        # menanig there is no logner an honest supermajority
+        # the best coarse of action is to leave the network
+        if (self.state.getValidatorLen() - len(self.newAttestationList) + more) < self.state.getValidatorSupermajorityLen():
+            print("Consensus cannot be reached. Terminating...")
+            exit(1)
+        # If we don't have a supermajority yet
+        elif len(self.newAttestationList) < self.state.getValidatorSupermajorityLen():
+            return
+        # If positive supermajority is reached
+        elif len(positive) > self.state.getValidatorSupermajorityLen():
+            # Attestations are stored for the next block
+            self.attestationList = self.newAttestationList
+            # TMP list is wiped
+            self.newAttestationList = []
+            # Proposed block can be safely added to the chain
+            self.store()
+            self.chain = self.newBlock
+            self.newBlock = None
+        else:
+            # Negative supermajority is reached
+            self.newAttestationList = []
+            self.newBlock = None
         return
 
-    def generateBlock(self) -> BlockSerializable | None:
+    def generateBlock(self) -> None:
         # Check current node is supposed to be the proposer
         if not self.cProt.getLeader == self.address:
             return None
@@ -128,7 +168,11 @@ class Blockchain:
         # Block is ready
         # No need to verify as blocks are verified on arrival
         # Proposed blocks are sent from here to recvBlock()
-        return bl
+        self.middleware.send(RPC.constructRPC('/block', [Param.constructParam('bl', 4, bl.serialize())]))
+        return
+    
+    def reassignRequest(self, txm: TxMeta) -> None:
+        pass
     
     def generateReassign(self, recp: bytes, value: int) -> TxMeta:
         return TxMetaNoSig(
@@ -171,7 +215,7 @@ class Blockchain:
                 return ntx.update(type=4)
         return None
     
-    def generateTX(self, type: int, fee: int, recp: bytes, value: int, data: bytes = b'', **kwargs) -> TxSerializable | TxMeta | None:
+    def generateTX(self, type: int, fee: int, recp: bytes, value: int, data: bytes = b'', **kwargs) -> None:
         # Create a placeholder TX
         txData = data
         # Decide on TX based on TxType
@@ -185,7 +229,8 @@ class Blockchain:
             # - We want to assign SC to someone else
             if (('MetaTX' not in kwargs.keys()) or not kwargs['MetaTX']):
                 # Construct, Sign and Send MetaTX
-                return self.generateReassign(recp, value)
+                txm = self.generateReassign(recp, value)
+                self.middleware.send(RPC.constructRPC('/txm', [Param.constructParam('txm', 6, txm.serialize())]))
         elif type == 2:
             # Register
             # Fill data with registerData serialized
@@ -218,7 +263,8 @@ class Blockchain:
             int(time.time()),
             txData
         )
-        return tx.sign(self.secretKey)
+        tx = tx.sign(self.secretKey)
+        self.middleware.send(RPC.constructRPC('/tx', [Param.constructParam('tx', 5, tx.serialize())]))
 
     def recvTx(self, tx: TxSerializable) -> None:
         # Reserve tmp for TX
@@ -258,22 +304,32 @@ class Blockchain:
         # Validate block on consensus layer
         ret = self.cProt.attest(self.state, self.chain.rebuildHash(), self.chain.block_number, self.getReward(), bl)
         # If this node is not the beneficiary
+        # If the block seems correct, 
         if self.address:
             if self.address != bl.beneficiary:
-                # If the length of attestationList is smaller than supermajority
-                if len(self.attestationList < self.state.getValidatorSupermajorityLen()):
-                    # Construct Attestation
-                    atns = AttestationNoSig(
-                        self.address,
-                        bl.rebuildHash(),
-                        b'\x01' if ret[1] else b'\x00'
-                    )
-                    at = atns.sign(self.secretKey)
-                    return at
+                # Send attestation
+                atns = AttestationNoSig(
+                    self.address,
+                    bl.rebuildHash(),
+                    b'\x01' if ret[1] else b'\x00'
+                )
+                at = atns.sign(self.secretKey)
+                self.middleware.send(RPC.constructRPC('/attestation', [Param.constructParam('at', 7, at.serialize())]))
         return None
-    
-    def recvConsensusBlock(self):
+
+    def pushBlock(self, bl: BlockSerializable):
+        # Without asking, accept incomming block
+        self.chain = bl
         pass
+
+    def passBlock(self) -> RPC:
+        # Peer requested last block
+        # Send own block at the top of the chain
+        rpc = RPC.constructRPC('/pushblock', [Param.constructParam('bl', 4, self.chain.serialize())])
+        rpc.type = 'getBlock!'
+        rpc.xclusive = True
+        rpc.sendback = False
+        return rpc
     
     def start(self):
         asyncio.run(self.run())
@@ -287,27 +343,59 @@ class Blockchain:
             msg = self.bridge.recv()
             if msg:
                 print(f"[BC] Got from P2P: {msg}")
-                # Validate / act on msg
-                response = b"Validated block"
-                self.bridge.send(response)
+                self.handleMessage(msg)
             time.sleep(0.1)
 
-    def constructRPC(self, func, params) -> RPC:
-        pass
-
-    def handleRPC(self, msg: RPC):
-        pass
+    def handleMessage(self, msg: RPC):
+        # Decode procedure call
+        procCall = msg.procedure.decode('ascii')
+        # Block request
+        if procCall == '/passBlock':
+            data = self.passBlock()
+            data.sender = msg.sender
+            # Send block to orig sender
+            self.middleware.send(data)
+        elif procCall == '/pushBlock':
+            self.pushBlock(BlockSerializable.deserialize(msg.params[0].value))
+        elif procCall == '/block':
+            self.recvBlock(BlockSerializable.deserialize(msg.params[0].value))
+        elif procCall == '/attestation':
+            self.recvAttestation(Attestation.deserialize(msg.params[0].value))
+        elif procCall == '/tx':
+            self.recvTx(TxSerializable.deserialize(msg.params[0].value))
+        elif procCall == '/txm':
+            self.reassignRequest(TxMeta.deserialize(msg.params[0].value))
+        return
 
     def gameplayLoop(self):
         while True:
-            # Repeat indefinitely
+            # -- Repeat indefinitely --
+            # 1. Select a leader (every system should start with at least one registered creator)
             self.cProt.selectLeader()
+            # 2. If WE have been selected
             if self.cProt.getLeader() == self.address:
-                b = self.generateBlock()
-                if b is not None:
-                    self.constructRPC(self.recvBlock, b)
+                # 2a. Generate a block
+                b = None
+                # 3a. Wait until WE have enough TXs in mempool
+                while b is None:
+                    # 4a. Generate a block
+                    b = self.generateBlock()
+                    asyncio.sleep(0.1)
+                # 5a. Encapsulate the block (to be send-ready)
+                rpc = RPC.constructRPC('/block', [Param.constructParam('b', 4, b.serialize())])
+                # 6a. Send the encapsulated block through the network
+                self.middleware.send(rpc)
             else:
+                # 2b. Wait for a new block to arrive
                 while self.newBlock is None:
                     asyncio.sleep(0.1)
-                
-            pass
+                # 3b. When a new block arrives, /recvBlock is called,
+                #     the block is validated and an attestation is sent (automatically)
+            # 7. (or 4.) Attestations were sent automatically upon block arrival
+            # 8. Upon attestation arrival, attestation list is queried
+            # 9. Block is either received or rejected
+            #    (also we can wait for more attestations or consensus may not be reached)
+            # 10. We wait until the new block has been processed
+            while self.newBlock is not None:
+                asyncio.sleep(0.1)
+            # 11. Rinse and Repeat!
