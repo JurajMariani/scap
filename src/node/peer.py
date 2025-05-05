@@ -62,11 +62,13 @@ class Peer(Serializable):
         )
     
 
-def fit_X(val: str | bytes | None, x: int = 16) -> bytes:
+def fit_X(val: str | bytes | int | None, x: int = 16) -> bytes:
     if val is None:
         return b'\x00' * x
     if isinstance(val, str):
         val = val.encode('ascii')
+    if isinstance(val, int):
+        val.to_bytes(x, 'big')
     return val[:x].ljust(x, b'\x00')
 
 def to_int(val: bytes | None) -> int:
@@ -159,3 +161,7 @@ class Message(Serializable):
     
     def serialize(self) -> bytes:
         return encode(self)
+    
+    @classmethod
+    def deserialize(cls, msg: bytes) -> Message:
+        return decode(msg, Message)

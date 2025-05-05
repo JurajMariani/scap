@@ -43,7 +43,7 @@ class Node:
             msg = self.middleware.recv()
             if msg:
                 print(f"[{self.node.getId()}][P2P] Got message from blockchain: {msg}")
-                await self.send(msg, '')
+                await self.send(msg, msg.type, 'x' if msg.xclusive else '', msg.sender if msg.xclusive else None, [self.node] if msg.sendback else None)
             await asyncio.sleep(0.1)
 
     async def start(self):
@@ -52,6 +52,8 @@ class Node:
     async def connectToBootstrapPeers(self):
         for peer in self.peers.copy():
             await self.sendMessage(self.getPeerHello(), peer)
+            # Ask peer for header block
+            await self.sendMessage(self.getPeerHeaderBlock(), peer)
 
     async def handleConnection(self):
         try:
@@ -86,6 +88,9 @@ class Node:
             'payload_length': 0,
             'payload': b''
         })
+    
+    def getPeerHeaderBlock(self) -> Message:
+        return self.getPeerMessage('BlockHead?')
 
     def getPeerHello(self) -> Message:
         return self.getPeerMessage('PeerHello')
@@ -94,28 +99,35 @@ class Node:
         return self.getPeerMessage('PeerOlleh')
 
     async def handleMessage(self, msg: Message):
-        
-        msgId = msg.get('id')
+        mmsg = msg.toDict()
+        msgId = mmsg['header'].get('id')
         if self.hasSeen(msgId):
             return
         self.rememberMsg(msgId)
-        print(f"[{self.port}] Received: msgid: {msg.get('id')}")
+        print(f"[{self.port}] Received: msgid: {mmsg['header'].get('id')}")
         # Auto-add sender to peer list
-        self.addPeer(msg.get('sender'))
+        self.addPeer(mmsg['header'].get('sender'))
 
         # Categorize based on type
-        msgType = msg.get('type')
+        msgType = mmsg['header'].get('type')
         # Subtype serves no purpose fo far
         # msgSubType = msg.get('subtype')
         if msgType == "PeerHello":
-            await self.sendMessage(self.getPeerOlleh(), decode(msg.get('sender')))
+            await self.sendMessage(self.getPeerOlleh(), decode(mmsg['header'].get('sender')))
         elif msgType == "PeerOlleh":
             return
+        elif msgType == "BlockHead?":
+            # TODO
+            self.middleware.send({})
         else:
             # Synchornization logic
-            # 1. Flood message
-            await self.sendMessage(msg, exclude=[self.node])
-            # 2. Execute message
+            # 1. Flood message if not subtype exclusive (x)
+            if mmsg['header']['subtype'] != 'x':
+                await self.sendMessage(msg, exclude=[self.node])
+            # 2. Include message details for sendback
+            payload = msg.payload
+            payload.sender = mmsg['header']['sender']
+            # 3. Execute message on Blockchain layer
             self.middleware.send(msg.payload)
 
     def hasSeen(self, msg_id):
