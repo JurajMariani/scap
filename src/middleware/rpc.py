@@ -1,7 +1,19 @@
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import Binary, binary, big_endian_int, CountableList
-from node.peer import fit_X, to_int
+from node.peer import fit_X, to_int, Peer
+
+"""
+TYPES:
+0. int
+1. str
+2. float
+3. bytes
+4. BlockSerializable
+5. TxSerializable
+6. TxMeta
+7. Attestation
+"""
 
 class Param(Serializable):
     fields = [
@@ -9,6 +21,18 @@ class Param(Serializable):
         ('type', Binary.fixed_length(1)),
         ('value', binary)
     ]
+
+    @classmethod
+    def fromDict(cls, ddict):
+        return Param(
+            ddict.get('name').encode('ascii'),
+            fit_X(ddict.get('type'), 1),
+            ddict.get('value')
+        )
+    
+    @classmethod
+    def constructParam(cls, name: str, type: int, value: bytes) -> Param:
+        return Param(name.encode('ascii'), fit_X(type, 1), value)
 
 class RPC(Serializable):
     fields = [
@@ -18,10 +42,23 @@ class RPC(Serializable):
         ('params', CountableList(Param))
     ]
 
-    @classmethod
-    def fromDict(cls) -> RPC:
-        pass
+    def __init__(self):
+        self.sender: Peer | None = None
 
+    @classmethod
+    def fromDict(cls, ddict: dict) -> RPC:
+        return RPC(
+            fit_X(ddict.get('phase'), 1),
+            fit_X(ddict.get('layer'), 1),
+            fit_X(ddict.get('from')),
+            fit_X(ddict.get('to')),
+            ddict.get('procedure').encode('ascii'),
+            ddict.get('params')
+        )
+    
+    @classmethod
+    def constructRPC(cls, func: str, params: list[Param]) -> RPC:
+        return RPC.fromDict({'layer': 0, 'phase': 0, 'procedure': func, 'params': params})
 
     def toDict(self) -> dict:
         paramList = []
