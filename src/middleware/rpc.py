@@ -75,20 +75,6 @@ class RPC(Serializable):
             'params': paramList
         }
 
-    def __init__(self):
-        self.pphase = ''
-        self.llayer = ''
-        self.proc = b''
-        self.paramList = []
-
-    def export(self) -> RPC:
-        return RPC(
-            self.pphase,
-            self.llayer,
-            self.proc,
-            self.paramList
-        )
-
     @classmethod
     def empty(self) -> RPC:
         return RPC(
