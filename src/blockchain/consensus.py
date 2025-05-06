@@ -2,10 +2,10 @@ from rlp.sedes import binary
 from math import sqrt, log2, log10
 import json
 
-from state import StateTrie
-from block import Attestation, AttestationNoSig, BlockSerializable
-from account import AccSerializable
-from randao import Randao
+from blockchain.state import StateTrie
+from blockchain.block import Attestation, AttestationNoSig, BlockSerializable
+from blockchain.account import AccSerializable
+from blockchain.randao import Randao
 
 class PoSC:
     def __init__(self):
@@ -17,9 +17,9 @@ class PoSC:
 
     def updateValidatorList(self, state: StateTrie) -> bool:
         scalingFn = ''
-        with open('../config/config.json') as f:
+        with open('config/config.json') as f:
             config = json.load(f)
-            scalingFn = config['sc_constrants']['scaling']
+            scalingFn = config['sc_constants']['scaling']
         # Chech working file
         if scalingFn == '':
             return False
@@ -63,7 +63,7 @@ class PoSC:
                 self.leader = address
                 return address
         # Obsolete assignment
-        self.leader = None
+        # self.leader = None
         return None
     
     def getLeader(self) -> bytes | None:

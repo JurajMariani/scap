@@ -42,16 +42,15 @@ class RPC(Serializable):
         ('params', CountableList(Param))
     ]
 
-    def __init__(self):
-        self.sender: Peer | None = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sender = None
 
     @classmethod
     def fromDict(cls, ddict: dict) -> RPC:
         return RPC(
             fit_X(ddict.get('phase'), 1),
             fit_X(ddict.get('layer'), 1),
-            fit_X(ddict.get('from')),
-            fit_X(ddict.get('to')),
             ddict.get('procedure').encode('ascii'),
             ddict.get('params')
         )
@@ -84,7 +83,7 @@ class RPC(Serializable):
             []
         )
 
-    def serialize(self) -> bytes:
+    def sserialize(self) -> bytes:
         return encode(self)
     
     @classmethod
@@ -92,4 +91,4 @@ class RPC(Serializable):
         return decode(payload, RPC)
 
     def size(self) -> int:
-        return len(self.serialize())
+        return len(self.sserialize())

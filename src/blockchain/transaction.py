@@ -102,7 +102,7 @@ class TxMeta(Serializable):
     def verifySig(self) -> bool:
         return self.recoverAddress() == self.sender
     
-    def serialize(self) -> bytes:
+    def sserialize(self) -> bytes:
         return encode(self)
     
     @classmethod
@@ -193,7 +193,7 @@ class TxSerializable(Serializable):
             s if not None else self.s
         )
     
-    def serialize(self) -> bytes:
+    def sserialize(self) -> bytes:
         return encode(self)
     
     @classmethod
@@ -219,7 +219,7 @@ class Transaction():
         return encode(TxSerializableNoSig(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data))
         #return (to_bytes(self.nonce) + to_bytes(self.gas_price) + to_bytes(self.gas_limit) + self.to + to_bytes(self.value) + self.data)
 
-    def serialize(self):
+    def sserialize(self):
         return encode(TxSerializable(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data, self.v, self.r, self.s))
 
     def hashTx(self):

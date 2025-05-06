@@ -1,6 +1,5 @@
 from eth_utils import keccak
 import random
-import time
 
 class Randao:
     def __init__(self):
@@ -12,7 +11,7 @@ class Randao:
     
     def reseed(self, seed: bytes) -> None:
         # Process: new_randao_seed = h(prev_seed XOR h(reveal))
-        self.seed = keccak(self.seed ^ keccak(seed))
+        self.seed = keccak(keccak(bytes(a ^ b for a, b in zip(self.seed, keccak(seed)))))
         self.rng.seed(self.seed)
 
     def getValue(self) -> float:

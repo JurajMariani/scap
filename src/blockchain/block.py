@@ -6,10 +6,9 @@ from eth_utils import keccak
 from trie import HexaryTrie
 from copy import deepcopy
 
-from transaction import Transaction, TxSerializable
-from state import StateTrie
+from blockchain.transaction import Transaction, TxSerializable
+from blockchain.state import StateTrie
 import json
-import blst
 
 class AttestationNoSig(Serializable):
     fields = [
@@ -59,7 +58,7 @@ class Attestation(Serializable):
     def verifySig(self) -> bool:
         return self.recoverAddress() == self.sender
     
-    def serialize(self) -> bytes:
+    def sserialize(self) -> bytes:
         return encode(self)
     
     def verdict(self) -> bool:
@@ -79,8 +78,8 @@ class BlockNoSig(Serializable):
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
-        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         #('signature', Binary.fixed_length(65, allow_empty=False)),
@@ -98,10 +97,10 @@ class BlockNoSig(Serializable):
         return BlockSig(
             self.parent_hash,
             self.state_root,
-            self.transasction_root,
+            self.transactions_root,
             self.attestations_root,
             self.receipts_root,
-            self.epoch_nuber,
+            self.epoch_number,
             self.block_number,
             self.randao_reveal,
             self.randao_seed,
@@ -122,8 +121,8 @@ class BlockSig(Serializable):
         ('receipts_root', Binary.fixed_length(32, allow_empty=False)),
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
-        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
@@ -138,10 +137,10 @@ class BlockSig(Serializable):
         return BlockNoSig(
             self.parent_hash,
             self.state_root,
-            self.transasction_root,
+            self.transactions_root,
             self.attestations_root,
             self.receipts_root,
-            self.epoch_nuber,
+            self.epoch_number,
             self.block_number,
             self.randao_reveal,
             self.randao_seed,
@@ -165,10 +164,10 @@ class BlockSig(Serializable):
         return BlockSerializable(
             self.parent_hash,
             self.state_root,
-            self.transasction_root,
+            self.transactions_root,
             self.attestations_root,
             self.receipts_root,
-            self.epoch_nuber,
+            self.epoch_number,
             self.block_number,
             self.randao_reveal,
             self.randao_seed,
@@ -195,8 +194,8 @@ class BlockSerializable(Serializable):
         # BLS signed (epoch_no + domain_randao)
         # We ignore epoch_no to simplify implementation
         # therefore, sign keccak(block_no + domain_randao)
-        ('randao_reveal', Binary.fixed_length(96, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(96, allow_empty=False)),
+        ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
@@ -216,9 +215,10 @@ class BlockSerializable(Serializable):
         return BlockSig(
             self.parent_hash,
             self.state_root,
-            self.transasction_root,
+            self.transactions_root,
+            self.attestations_root,
             self.receipts_root,
-            self.epoch_nuber,
+            self.epoch_number,
             self.block_number,
             self.randao_reveal,
             self.beneficiary,
@@ -245,7 +245,8 @@ class BlockSerializable(Serializable):
             i += 2
         return b''
     
-    def int_to_minimal_bytes(n: int) -> bytes:
+    @classmethod
+    def int_to_minimal_bytes(cls, n: int) -> bytes:
         if n == 0:
             return b'\x00'
         length = (n.bit_length() + 7) // 8
@@ -262,8 +263,10 @@ class BlockSerializable(Serializable):
         # Construct message
         message = self.int_to_minimal_bytes(randao_constant) + self.int_to_minimal_bytes(self.block_number)
         message = keccak(message)
+        signature = keys.Signature(self.randao_reveal)
+        pk = keys.PublicKey(benefBLS)
         # Verify signature
-        return blst.verify(benefBLS, message, self.randao_reveal)
+        return signature.verify_msg_hash(message, pk)
     
     def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int) -> tuple[StateTrie, bool]:
         # Verify block signature
@@ -378,7 +381,7 @@ class BlockSerializable(Serializable):
             return False
         return True
     
-    def serialize(self) -> bytes:
+    def sserialize(self) -> bytes:
         return encode(self)
     
     @classmethod
@@ -409,14 +412,14 @@ class Block():
     def serializeSig(self):
         return encode(BlockSig(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data))
 
-    def serialize(self):
+    def sserialize(self):
         print(self.signature.to_bytes().hex())
         return encode(BlockSerializable(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data, []))
     
     def serializeTxs(self):
         txs = []
         for tx in self.transactions:
-            txs.append(tx.serialize())
+            txs.append(tx.sserialize())
         return txs
 
     def sign(self, pub_key: str):

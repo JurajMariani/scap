@@ -12,7 +12,7 @@ class AffiliateMedia(Serializable):
 class AffiliateMediaList(Serializable):
     fields = [
         ('media', CountableList(AffiliateMedia)),
-        ('validator_pub_key', Binary.fixed_length(48, allow_empty=False))
+        ('validator_pub_key', Binary.fixed_length(64, allow_empty=False))
     ]
 
 class Endorsement(Serializable):
@@ -38,7 +38,7 @@ class AccSerializable(Serializable):
         ('active_sc', big_endian_int),
         ('effective_sc', big_endian_int),
         # BLS key
-        ('validator_pub_key', Binary.fixed_length(48, allow_empty=True)),
+        ('validator_pub_key', Binary.fixed_length(64, allow_empty=True)),
         ('endorsed', CountableList(Endorsement)),
         ('endorsed_by', CountableList(Endorsement)),
         ('soc_media', CountableList(AffiliateMedia))
@@ -79,7 +79,8 @@ class AccSerializable(Serializable):
             soc_media if not None else self.soc_media
         )
     
-    def blank(self) -> AccSerializable:
+    @classmethod
+    def blank(cls) -> AccSerializable:
         return AccSerializable(
             0,              # nonce
             0,              # forwarder
@@ -89,7 +90,7 @@ class AccSerializable(Serializable):
             0,              # passive sc
             0,              # active sc
             0,              # effective sc
-            b'\x00' * 48,   # validator pub key
+            b'\x00' * 64,   # validator pub key
             [],             # endorsed
             [],             # endorsed by
             []              # soc media
@@ -123,7 +124,7 @@ class Account():
         pass
 
 
-    def serialize(self):
+    def sserialize(self):
         pass
         #return encode(AccSerializable(self.nonce, self.balance, self.id_hash, self.vc_zkp, self.passive_sc, self.active_sc, self.effective_sc))
     

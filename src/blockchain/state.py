@@ -6,8 +6,8 @@ import json
 import time
 
 from rlp import encode, decode
-from transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
-from account import AccSerializable, Endorsement, RegisterData, AffiliateMedia, AffiliateMediaList
+from blockchain.transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
+from blockchain.account import AccSerializable, Endorsement, RegisterData, AffiliateMedia, AffiliateMediaList
 
 # TODO
 # A method of AccSerializable has been added - `isConsensusNode()` and `isVerified()`

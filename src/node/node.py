@@ -2,7 +2,8 @@ import asyncio
 from uuid import uuid4
 import json
 from collections import deque
-from peer import Peer, Message, MessageHeader
+from node.peer import Peer
+from node.message import Message, MessageHeader
 from rlp import decode
 from middleware.rpc import RPC
 from middleware.middleware import Postman
@@ -22,7 +23,7 @@ class Node:
         self.node = Peer.create(str(uuid4()), host, port)
         self.peers: set[Peer] = bstrapPeers
         self.server = None
-        with open('../config/config.json') as f:
+        with open('config/config.json') as f:
             self.config = json.load(f)
         self.recent_messages = deque(maxlen=self.config['network']['max_messages_kept'])
         self.message_set = set()
@@ -33,20 +34,30 @@ class Node:
         await self.startServer()
 
     async def startServer(self):
-        self.server = await asyncio.start_server(self.handleConnection, self.node.host, self.node.port)
-        print(f"Node listening on {self.node.host}:{self.node.port}")
+        print("AAA")
+        try:
+            self.server = await asyncio.start_server(self.handleConnection, self.node.getHost(), self.node.getPort())
+        except Exception as e:
+            print("KOKOOOOS", e)
+        print(f"Node listening on {self.node.getHost()}:{self.node.getPort()}")
         await self.connectToBootstrapPeers()
         await self.server.serve_forever()
 
     async def listenToBlockchain(self):
+        print("Listening to Middleware starts")
         while True:
+            #print("Queuelen: ", self.middleware.in_q.qsize())
             msg = self.middleware.recv()
-            if msg:
-                print(f"[{self.node.getId()}][P2P] Got message from blockchain: {msg}")
-                await self.send(msg, msg.type, 'x' if msg.xclusive else '', msg.sender if msg.xclusive else None, [self.node] if msg.sendback else None)
+            if msg and type(msg) == RPC:
+                print(f"[{self.node.getId()}][P2P] Got message from blockchain: {msg.sserialize()}")
+                if (msg.sender is not None):
+                    await self.send(msg, '', '', msg.sender, [self.node] if msg.sender is not None else None)
+                else:
+                    print("Sender is none ", msg.size())
+                    await self.send(msg, '')
             await asyncio.sleep(0.1)
 
-    async def start(self):
+    def start(self):
         asyncio.run(self.run())
 
     async def connectToBootstrapPeers(self):
@@ -179,7 +190,7 @@ class Node:
 
     async def networkSend(self, to: Peer, what: Message):
         try:
-            to.writer.write(what.serialize())
+            to.writer.write(what.sserialize())
             await to.writer.drain()
         except Exception as e:
             print(f"[{self.node.getId()}] Failed to send message to {to.getHost()}:{to.getPort()} — {e}")
