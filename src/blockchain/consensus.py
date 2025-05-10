@@ -1,5 +1,5 @@
 from rlp.sedes import binary
-from math import sqrt, log2, log10
+from math import sqrt, log2, log10, log
 import json
 
 from blockchain.state import StateTrie
@@ -28,11 +28,18 @@ class PoSC:
         # Request validator list
         valList = state.getValidators()
         # Set function ptr
+        # TODO
+        # The scaling should be dynamic to automatically adjust effective social capital
+        # to ensure no single account has more than 10% of effective social capital
+        # This should be the default operation starting as soon as the 10th nodes stakes
+        # its active social capital
         fn = None
         if scalingFn == 'root':
             fn = sqrt
         elif scalingFn == 'log10':
             fn = log10
+        elif scalingFn == 'ln':
+            fn = log
         else:
             # Default is log2
             fn = log2

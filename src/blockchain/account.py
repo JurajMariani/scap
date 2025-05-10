@@ -67,16 +67,16 @@ class AccSerializable(Serializable):
         return AccSerializable(
             self.nonce + 1 if nonce else self.nonce,
             self.forwarder + 1 if forwarder else self.forwarder,
-            balance if not None else self.balance,
-            id_hash if not None else self.id_hash,
-            vc_zkp if not None else self.vc_zkp,
-            passive_sc if not None else self.passive_sc,
-            active_sc if not None else self.active_sc,
-            effective_sc if not None else self.effective_sc,
-            validator_pub_key if not None else self.validator_pub_key,
-            endorsed if not None else self.endorsed,
-            endorsed_by if not None else self.endorsed_by,
-            soc_media if not None else self.soc_media
+            balance if balance is not None else self.balance,
+            id_hash if id_hash is not None else self.id_hash,
+            vc_zkp if vc_zkp is not None else self.vc_zkp,
+            passive_sc if passive_sc is not None else self.passive_sc,
+            active_sc if active_sc is not None else self.active_sc,
+            effective_sc if effective_sc is not None else self.effective_sc,
+            validator_pub_key if validator_pub_key is not None else self.validator_pub_key,
+            endorsed if endorsed is not None else self.endorsed,
+            endorsed_by if endorsed_by is not None else self.endorsed_by,
+            soc_media if soc_media is not None else self.soc_media
         )
     
     @classmethod
@@ -95,6 +95,13 @@ class AccSerializable(Serializable):
             [],             # endorsed by
             []              # soc media
         )
+    
+    def sserialize(self) -> bytes:
+        return encode(self)
+    
+    @classmethod
+    def ddeserialize(cls, acc: bytes) -> AccSerializable:
+        return decode(acc, AccSerializable)
 
 class Account():
     def __init__(self, non, bal):

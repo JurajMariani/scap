@@ -3,7 +3,7 @@ import random
 
 class Randao:
     def __init__(self):
-        self.seed = b'\x00'
+        self.seed: bytes = b'\x00'
         self.rng = random.Random(self.seed)
 
     def get_seed(self) -> bytes:

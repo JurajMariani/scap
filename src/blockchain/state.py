@@ -5,7 +5,7 @@ from rlp.sedes import binary
 import json
 import time
 
-from rlp import encode, decode
+from rlp import decode
 from blockchain.transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
 from blockchain.account import AccSerializable, Endorsement, RegisterData, AffiliateMedia, AffiliateMediaList
 
@@ -25,7 +25,7 @@ class StateTrie:
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
 
-    def transaction(self, tx: TxSerializable, verify:bool = True, execute: bool = True) -> bool:
+    def transaction(self, tx: TxSerializable, verify: bool = True, execute: bool = True) -> bool:
         type = tx.type
         if type == 0:
             # Normal transaction
@@ -45,19 +45,19 @@ class StateTrie:
 
     def addAccount(self, acc: AccSerializable, address: bytes) -> None:
         key = keccak(address)
-        self.state_trie[key] = encode(acc)
+        self.state_trie[key] = acc.sserialize()
 
     def getAccount(self, address: bytes) -> AccSerializable | None:
         key = keccak(address)
         try:
             acc = self.state_trie[key]
-            return decode(acc, AccSerializable)
+            return AccSerializable.ddeserialize(acc)
         except KeyError:
             return None
 
     def updateAccount(self, address: bytes, acc: AccSerializable) -> None:
         key = keccak(address)
-        self.state_trie[key] = encode(acc)
+        self.state_trie[key] = acc.sserialize()
 
     def accountExists(self, acc: bytes) -> bool:
         key = keccak(acc)
@@ -99,7 +99,7 @@ class StateTrie:
         self.updateAccount(beneficiary, benefEnriched)
         return True
     
-    def verifyTX(self, tx: TxSerializable, accSender) -> bool:
+    def verifyTX(self, tx: TxSerializable, accSender, execute: bool) -> bool:
         # Verify TX signature
         if not tx.verifySig():
             return False
@@ -111,17 +111,29 @@ class StateTrie:
             if (tx.type == 0):
                 if (not self.accountExists(tx.to)):
                     # Create beneficiary account
-                    self.addAccount(AccSerializable().blank(), tx.to)
+                    self.addAccount(AccSerializable.blank(), tx.to)
         else:
             # Register type TX can crate SENDER account
             if (not self.getAccount(tx.sender)):
                 # Create blank sender
-                self.addAccount(AccSerializable().blank(), tx.sender)
+                self.addAccount(AccSerializable.blank(), tx.sender)
         # Check transaction & user nonces
-        if (accSender.nonce != tx.nonce):
+        if not execute:
+            if (tx.nonce < accSender.nonce):
+                return False
+        else:
+            print(f"accN: {accSender.nonce} and txN: {tx.nonce}")
+            if (accSender.nonce != tx.nonce):
+                print("Not EQUAL, should exit")
+                return False
+        # Check sender has enough funds to send TX (to pay the fee)
+        if (accSender.balance < tx.fee):
             return False
         # Check values are not negative
         if (tx.fee < 0 or tx.value < 0):
+            return False
+        # Check timestamp
+        if (tx.timestamp > int(time.time())):
             return False
         return True
 
@@ -130,18 +142,26 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if (verify):
-            if (not self.verifyTransfer(tx)):
+            if (not self.verifyTransfer(tx, execute)):
                 return False
+        print("-------- all gut?")
         if (not execute):
             return True
+        print("U sure about that?")
         accSender = self.getAccount(tx.sender)
         accBenef = self.getAccount(tx.to)
+        # Check NONCE
+        if accSender.nonce != tx.nonce:
+            print("NONCE DOES NOT MATCH!", accSender.nonce, tx.nonce)
+            return False
         # Initiate swap
         updatedSender = accSender.update(nonce=True, balance=(accSender.balance - tx.value - tx.fee))
+        print(f"NONCE PREtransfer {accSender.nonce} and POSTtransfer {updatedSender.nonce}")
         updatedRec = accBenef.update(balance=(accBenef.balance + tx.value))
         # Record changes
         self.updateAccount(tx.sender, updatedSender)
         self.updateAccount(tx.to, updatedRec)
+        print(f"Actually yeah (sender nonce = {self.getAccount(tx.sender).nonce})")
         return True
 
     def verifyMetaTX(self, meta: TxMeta) -> bool:
@@ -166,27 +186,24 @@ class StateTrie:
             return False
         return True
     
-    def verifyTransfer(self, tx: TxSerializable) -> bool:
+    def verifyTransfer(self, tx: TxSerializable, execute: bool) -> bool:
         accSender = self.getAccount(tx.sender)
         # Verify TX common
-        if (not self.verifyTX(tx, accSender)):
+        if (not self.verifyTX(tx, accSender, execute)):
             return False
         # Check sender funds
         if (accSender.balance < tx.value + tx.fee):
             return False
-        # Check timestamp
-        if (tx.timestamp > int(time.time)):
-            return False
         return True
     
-    def verifyReassign(self, tx: TxSerializable) -> bool:
+    def verifyReassign(self, tx: TxSerializable, execute: bool) -> bool:
         accSender = self.getAccount(tx.sender)
         # Verify TX common
-        if (not self.verifyTX(tx, accSender)):
+        if (not self.verifyTX(tx, accSender, execute)):
             return False
         # Verify base MetaTX
         # Reassign type TXs contain MetaTXs in data field
-        metaTx = decode(tx.data, TxMeta)
+        metaTx = TxMeta.ddeserialize(tx.data)
         if (not self.verifyMetaTX(metaTx)):
             return False
         # Verify receiver is a verifier
@@ -220,12 +237,16 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
-            if not self.verifyReassign(tx):
+            if not self.verifyReassign(tx, execute):
                 return False
         if (not execute):
             return True
         scBeneficiary = self.getAccount(tx.sender)
-        metaTx = decode(tx.data, TxMeta)
+        # Verify TX nonce
+        if scBeneficiary.nonce != tx.nonce:
+            return False
+        # Extract meta tx
+        metaTx = TxMeta.ddeserialize(tx.data)
         scSender = self.getAccount(metaTx.sender)
         # --- Initiate changes ---
         # Negative metaTx.sc means withdrawal of SC
@@ -275,7 +296,7 @@ class StateTrie:
         else:
             return False
         
-        scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList)
+        scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList, balance=(scSender.balance - tx.fee))
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)
@@ -284,9 +305,9 @@ class StateTrie:
         self.addValidator(tx.sender, scSender.active_sc + metaTx.sc)
         return True
     
-    def verifyRegister(self, tx:TxSerializable) -> bool:
+    def verifyRegister(self, tx:TxSerializable, execute: bool) -> bool:
         # Verify common TX elements
-        if (not self.verifyTX(tx)):
+        if (not self.verifyTX(tx, execute)):
             return False
         # Verify data field
         d = decode(tx.data, RegisterData)
@@ -306,7 +327,7 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
-            if (not self.verifyRegister(tx)):
+            if (not self.verifyRegister(tx, execute)):
                 return False
         if (not execute):
             return True
@@ -321,10 +342,13 @@ class StateTrie:
             return False
         # Initiate change
         accSender = self.getAccount(tx.sender)
+        # Check TX nonce
+        if accSender.nonce != tx.nonce:
+            return False
         accUpdated = AccSerializable(
             accSender.nonce + 1,
             accSender.forwarder,
-            accSender.balance,
+            accSender.balance - tx.fee,
             regd.id_hash,
             regd.vc_zkp,
             passSc,
@@ -338,9 +362,9 @@ class StateTrie:
         self.updateAccount(tx.sender, accUpdated)
         return True
     
-    def verifyAffiliate(self, tx: TxSerializable) -> bool:
+    def verifyAffiliate(self, tx: TxSerializable, execute: bool) -> bool:
         # Verify common TX elements
-        if (not self.verifyTX(tx)):
+        if (not self.verifyTX(tx, execute)):
             return False
         # Verify data field
         d = decode(tx.data, AffiliateMediaList)
@@ -368,7 +392,7 @@ class StateTrie:
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
-            if (not self.verifyAffiliate(tx)):
+            if (not self.verifyAffiliate(tx, execute)):
                 return False
         if (not execute):
             return True
@@ -377,6 +401,9 @@ class StateTrie:
         affList = list(affMediaList.media)
         accSender = self.getAccount(tx.sender)
         socAccs = list(accSender.soc_media)
+        # Check TX nonce
+        if accSender.nonce != tx.nonce:
+            return False
         # Recover SocMedia list from sender
         # For each affiliation
         for aff in affList:
@@ -404,20 +431,7 @@ class StateTrie:
                 else:
                     del socAccs[idx]
         # Initiate changes
-        accSenderUpdated = AccSerializable(
-            accSender.nonce + 1,
-            accSender.forwarder,
-            accSender.balance,
-            accSender.id_hash,
-            accSender.vc_zkp,
-            accSender.passive_sc,
-            accSender.active_sc,
-            accSender.effective_sc,
-            affList.validator_pub_key,
-            accSender.endorsed,
-            accSender.endorsed_by,
-            socAccs
-        )
+        accSenderUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), validator_pub_key=affList.valudator_pub_key, soc_media=socAccs)
         # Update Account
         self.updateAccount(tx.sender, accSenderUpdated)
         # Register account as a validator

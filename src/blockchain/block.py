@@ -61,11 +61,11 @@ class Attestation(Serializable):
     def sserialize(self) -> bytes:
         return encode(self)
     
-    def verdict(self) -> bool:
-        return self.verdict == '\x01'
+    def getVerdict(self) -> bool:
+        return self.verdict == b'\x01'
 
     @classmethod
-    def deserialize(cls, att) -> Attestation:
+    def ddeserialize(cls, att) -> Attestation:
         return decode(att, Attestation)
     
 
@@ -79,38 +79,39 @@ class BlockNoSig(Serializable):
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
         ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', binary),#Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
-        #('signature', Binary.fixed_length(65, allow_empty=False)),
-        ('data', binary),
-        #('transactions', CountableList(Transaction))
-        #('attestations', CountableList(Attestation))
+        ('data', binary)
     ]
 
     def hash(self) -> bytes:
         return keccak(encode(self))
     
     def sign(self, privK: bytes) -> BlockSig:
-        sk = keys.PrivateKey(privK)
-        sig = sk.sign_msg_hash(self.hash())
-        return BlockSig(
-            self.parent_hash,
-            self.state_root,
-            self.transactions_root,
-            self.attestations_root,
-            self.receipts_root,
-            self.epoch_number,
-            self.block_number,
-            self.randao_reveal,
-            self.randao_seed,
-            self.beneficiary,
-            self.timestamp,
-            sig.v,
-            sig.r,
-            sig.s,
-            self.data
-        )
+        try:
+            sk = keys.PrivateKey(privK)
+            sig = sk.sign_msg_hash(self.hash())
+            return BlockSig(
+                self.parent_hash,
+                self.state_root,
+                self.transactions_root,
+                self.attestations_root,
+                self.receipts_root,
+                self.epoch_number,
+                self.block_number,
+                self.randao_reveal,
+                self.randao_seed,
+                self.beneficiary,
+                self.timestamp,
+                sig.v,
+                sig.r,
+                sig.s,
+                self.data
+            )
+        except Exception as e:
+            print("EEEEE", e)
+        return None
 
 class BlockSig(Serializable):
     fields = [
@@ -122,15 +123,13 @@ class BlockSig(Serializable):
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
         ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', binary),#Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
         ('sig_r', big_endian_int),
         ('sig_s', big_endian_int),
-        ('data', binary),
-        #('transactions', CountableList(Transaction))
-        #('attestations', CountableList(Attestation))
+        ('data', binary)
     ]
 
     def getNoSig(self) -> BlockNoSig:
@@ -195,7 +194,7 @@ class BlockSerializable(Serializable):
         # We ignore epoch_no to simplify implementation
         # therefore, sign keccak(block_no + domain_randao)
         ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
-        ('randao_seed', Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', binary),#Binary.fixed_length(65, allow_empty=False)),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('sig_v', big_endian_int),
@@ -221,6 +220,7 @@ class BlockSerializable(Serializable):
             self.epoch_number,
             self.block_number,
             self.randao_reveal,
+            self.randao_seed,
             self.beneficiary,
             self.timestamp,
             self.sig_v,
@@ -232,7 +232,8 @@ class BlockSerializable(Serializable):
     def rebuildHash(self):
         return self.getBlockSig().getNoSig().hash()
     
-    def calculateListHash(self, llist: list) -> bytes:
+    @classmethod
+    def calculateListHash(cls, llist: list) -> bytes:
         hashlist = []
         for tx in llist:
             hashlist.append(tx.hash())
@@ -243,7 +244,7 @@ class BlockSerializable(Serializable):
             nhash = hashlist[i] + hashlist[i + 1]
             hashlist.append(keccak(nhash))
             i += 2
-        return b''
+        return keccak(b'')
     
     @classmethod
     def int_to_minimal_bytes(cls, n: int) -> bytes:
@@ -254,9 +255,9 @@ class BlockSerializable(Serializable):
     
     def verifyRandao(self, benefBLS: bytes) -> bool:
         randao_constant = 0
-        with open('../config/config.json') as f:
+        with open('config/config.json') as f:
             config = json.load(f)
-            randao_constant = config['sc_constrants']['domain_randao']
+            randao_constant = config['sc_constants']['domain_randao']
         # Verify file works
         if (randao_constant == 0):
             return False
@@ -295,10 +296,10 @@ class BlockSerializable(Serializable):
         if (not self.verifyTXs(state)):
             return (state, False)
         # Verify parent hash
-        if (not self.parent_hash != parentH):
+        if self.parent_hash != parentH:
             return (state, False)
         # Verify block number
-        if (not self.block_number != parentBlockNo + 1):
+        if self.block_number != parentBlockNo + 1:
             return (state, False)
         # Verify prev. block attestations
         if not self.verifyAttestations(state):
@@ -319,7 +320,8 @@ class BlockSerializable(Serializable):
                 return False
         return True
     
-    def getStateAfterExecution(self, state: StateTrie, currReward: int) -> StateTrie:
+    @classmethod
+    def getStateAfterExec(cls, state: StateTrie, txs: list[TxSerializable], benef: bytes, currReward: int) -> tuple[StateTrie, bool]:
         # 1. deepcopy state to a tmp variable
         tmp = StateTrie()
         tmp.db = deepcopy(state.db)
@@ -328,16 +330,24 @@ class BlockSerializable(Serializable):
         tmp.state_trie = HexaryTrie(tmp.db, root_hash=state.getRootHash())
         tmp.id_trie = HexaryTrie(tmp.iddb, root_hash=state.id_trie.root_hash)
         # 2. On the tmp state, no-verify, execute all txs
-        for tx in self.transactions:
-            tmp.transaction(tx, False, True)
+        for tx in txs:
+            if not tmp.transaction(tx, False,  True):
+                return (state, False)
         # 3. Calculate beneficiary enrichment
         enrichment = 0
-        for tx in self.transactions:
+        for tx in txs:
             enrichment += tx.fee
         enrichment += currReward
+        enrichment = int(enrichment)
         # 4. Enrich beneficiary (reward + fees)
-        state.coinbase(self.beneficiary, enrichment)
-        return tmp
+        if not tmp.coinbase(benef, enrichment):
+            print("ERROR")
+            return (state, False)
+        return (tmp, True)
+    
+    def getStateAfterExecution(self, state: StateTrie, currReward: int) -> tuple[StateTrie, bool]:
+        return BlockSerializable.getStateAfterExec(state, self.transactions, self.beneficiary, currReward)
+        
     
     def verifyStateAfterExecution(self, state: StateTrie, currReward: int) -> tuple[StateTrie, bool]:
         '''
@@ -345,15 +355,26 @@ class BlockSerializable(Serializable):
         The validity of the block can be inferred from the boolean value.
         '''
         # 1. - 4. Execute TXs
-        tmp = self.getStateAfterExecution(state, currReward)
+        try:
+            res = self.getStateAfterExecution(state, currReward)
+        except Exception as e:
+            print("WATAFUK: ", e)
+        # In case of incorrect TXs
+        if not res[1]:
+            return (state, False)
         # 5. Verify state roothash
-        if (self.state_root != tmp.getRootHash()):
+        # A scenario, in which all TXs are correct and executable,
+        #   but root hashes are different
+        #   (Leader could have increased their balance)
+        if (self.state_root != res[0].getRootHash()):
+            print("States do not equal")
             # 6. IF NONMATCHING ROOTHASH
             #   7. Discard Changes (new final state is orig)
             return (state, False)
+        print("State match")
         # 6. IF MATCHING ROOTHASH
         #   7. Apply Changes (new final state is tmp)
-        return (tmp, True)
+        return (res[0], True)
     
     def verifyAttestations(self, state: StateTrie) -> bool:
         # Verify a supermajority attested
@@ -369,12 +390,14 @@ class BlockSerializable(Serializable):
             if att.block_hash != self.parent_hash:
                 return False
             # Count positive verdicts
-            if att.verdict():
+            if att.getVerdict():
                 positiveVerdicts += 1
             # Verify verifier signature
+            attns = AttestationNoSig(att.sender, att.block_hash, att.verdict)
             sig = keys.Signature(vrs=(att.v, att.r, att.s))
-            pk = sig.recover_public_key_from_msg_hash(att.block_hash)
+            pk = sig.recover_public_key_from_msg_hash(attns.hash())
             if pk.to_canonical_address() != att.sender:
+                print(pk.to_canonical_address(), att.sender)
                 return False
         # Verify positive attestation count
         if positiveVerdicts < state.getValidatorSupermajorityLen():
@@ -385,7 +408,7 @@ class BlockSerializable(Serializable):
         return encode(self)
     
     @classmethod
-    def deserialize(cls, bl: bytes) -> BlockSerializable:
+    def ddeserialize(cls, bl: bytes) -> BlockSerializable:
         return decode(bl, BlockSerializable)
 
 
@@ -413,7 +436,6 @@ class Block():
         return encode(BlockSig(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data))
 
     def sserialize(self):
-        print(self.signature.to_bytes().hex())
         return encode(BlockSerializable(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data, []))
     
     def serializeTxs(self):

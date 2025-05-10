@@ -5,11 +5,11 @@ from middleware.middleware import Postman
 import asyncio
 import signal
 import atexit
-from tests.factory import getCreds
+from tests.factory import Adam
 
 class Bootstrapper:
     def __init__(self):
-        self.c = getCreds()
+        self.c = Adam()
         self.queue_bc_to_p2p = Queue()
         self.queue_p2p_to_bc = Queue()
         # Bridge the gap
@@ -22,21 +22,18 @@ class Bootstrapper:
 
     def cleanup(self):
         print('Called cleanup')
-        self.node.closeConnections()
+        self.node.shutdown()
+        self.blockchain.shutdown()
 
     def start(self):
-        self.bridge_bc.send("AAA")
-        self.bridge_p2p.send("XXX")
-        #loop = asyncio.get_running_loop()
         self.node = Node(self.bridge_p2p, '127.0.0.1', 5000, [])
         self.blockchain = Blockchain(self.bridge_bc, self.c[1], self.c[0][1].to_canonical_address(), self.c[0][0].to_bytes(), self.c[4], self.c[3])
-
         # Launch processes
-        p_node = Process(target=lambda: self.node.start())
-        p_blockchain = Process(target=lambda: self.blockchain.start())
+        p_node = Process(target=self.node.start)
+        p_blockchain = Process(target=self.blockchain.start)
         # Add sigINT/TERM protection
-        #loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(self.cleanup()))
-        #loop.add_signal_handler(signal.SIGTERM, lambda: asyncio.create_task(self.cleanup()))
+        signal.signal(signal.SIGINT, lambda sig, frame: self.cleanup())
+        signal.signal(signal.SIGTERM, lambda sig, frame: self.cleanup())
         # Start the show
         p_node.start()
         p_blockchain.start()

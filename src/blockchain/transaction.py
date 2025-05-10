@@ -106,7 +106,7 @@ class TxMeta(Serializable):
         return encode(self)
     
     @classmethod
-    def deserialize(cls, txm) -> TxMeta:
+    def ddeserialize(cls, txm) -> TxMeta:
         return decode(txm, TxMeta)
 
 class TxSerializable(Serializable):
@@ -197,8 +197,23 @@ class TxSerializable(Serializable):
         return encode(self)
     
     @classmethod
-    def deserialize(cls, tx) -> TxSerializable:
+    def ddeserialize(cls, tx: bytes) -> TxSerializable:
         return decode(tx, TxSerializable)
+    
+    def eq(self, b: TxSerializable) -> bool:
+        return (
+            self.nonce == b.nonce and
+            self.type == b.type and
+            self.fee == b.fee and
+            self.sender == b.sender and
+            self.to == b.to and 
+            self.value == b.value and
+            self.timestamp == b.timestamp and
+            self.data == b.data and
+            self.v == b.v and
+            self.r == b.r and
+            self.s == b.s
+        )
 
 class Transaction():
     def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):

@@ -87,7 +87,7 @@ class RPC(Serializable):
         return encode(self)
     
     @classmethod
-    def deserialize(cls, payload) -> RPC:
+    def ddeserialize(cls, payload) -> RPC:
         return decode(payload, RPC)
 
     def size(self) -> int:
