@@ -1,0 +1,26 @@
+import "signatures/verifyEddsa" as verifyEddsa;
+import "hashes/keccak/256bit" as keccak;
+//import "utils/casts/u32_8_to_bool_256" as u32_8_to_bool_256;
+import "utils/pack/u32/pack256" as ipack256;
+import "./utils/u8_32_to_u32_8" as u8_32_to_u32_8;
+import "ecc/babyjubjubParams.code" as context;
+
+def c_hash(u8[512] input) -> u32[8] {
+    return u8_32_to_u32_8(keccak(input));
+}
+
+// 
+def main(field[2] issuer_pub_key, field hash, private u8[512] vc, private field[2] sig_R, private field sig_S) {
+    // Compute KECCAK hash of the VC and compare with input hash
+    u32[8] raw_hash = c_hash(vc);
+    field computed_hash = ipack256(raw_hash);
+    
+    // Verify the signature using the provided issuer's public key
+    assert(verifyEddsa(sig_R, sig_S, issuer_pub_key, raw_hash, [0;8], context()));
+
+    
+    // Convert field to
+    assert(computed_hash == hash);
+
+    return;
+}

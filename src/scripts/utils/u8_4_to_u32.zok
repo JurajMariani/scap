@@ -1,0 +1,18 @@
+import "utils/casts/u8_to_bits" as u8_to_bits;
+import "utils/casts/u32_from_bits" as u32_from_bits;
+
+def main(u8[4] input) -> u32 {
+    bool[8] b0 = u8_to_bits(input[0]);
+    bool[8] b1 = u8_to_bits(input[1]);
+    bool[8] b2 = u8_to_bits(input[2]);
+    bool[8] b3 = u8_to_bits(input[3]);
+
+    bool[32] mut comb = [false;32];
+    for u32 i in 0..8 {
+        comb[i]      = b0[i];
+        comb[i + 8]  = b1[i];
+        comb[i + 16] = b2[i];
+        comb[i + 24] = b3[i];
+    }
+    return u32_from_bits(comb);
+}

@@ -1,0 +1,10 @@
+import "./u8_4_to_u32" as u8_4_to_u32;
+
+def main(u8[32] input) -> u32[8] {
+    u32[8] mut result = [0; 8];
+    for u32 i in 0..8 {
+        u8[4] src = [input[4*i], input[4*i+1], input[4*i+2], input[4*i+3]];
+        result[i] = u8_4_to_u32(src);
+    }
+    return result;
+}
