@@ -32,6 +32,7 @@ class Param(Serializable):
     
     @classmethod
     def constructParam(cls, name: str, type: int, value: bytes) -> Param:
+        Param(name.encode('ascii'), fit_X(type, 1), value)
         return Param(name.encode('ascii'), fit_X(type, 1), value)
 
 class RPC(Serializable):
@@ -44,7 +45,8 @@ class RPC(Serializable):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sender = None
+        self.senderId: str = ''
+        self.xclusive: bool = False
 
     @classmethod
     def fromDict(cls, ddict: dict) -> RPC:

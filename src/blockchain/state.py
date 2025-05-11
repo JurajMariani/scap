@@ -51,8 +51,11 @@ class StateTrie:
         key = keccak(address)
         try:
             acc = self.state_trie[key]
+            if not acc:
+                return None
             return AccSerializable.ddeserialize(acc)
-        except KeyError:
+        except Exception as e:
+            print(e, "Looking for", address)
             return None
 
     def updateAccount(self, address: bytes, acc: AccSerializable) -> None:
@@ -122,7 +125,6 @@ class StateTrie:
             if (tx.nonce < accSender.nonce):
                 return False
         else:
-            print(f"accN: {accSender.nonce} and txN: {tx.nonce}")
             if (accSender.nonce != tx.nonce):
                 print("Not EQUAL, should exit")
                 return False
@@ -144,10 +146,8 @@ class StateTrie:
         if (verify):
             if (not self.verifyTransfer(tx, execute)):
                 return False
-        print("-------- all gut?")
         if (not execute):
             return True
-        print("U sure about that?")
         accSender = self.getAccount(tx.sender)
         accBenef = self.getAccount(tx.to)
         # Check NONCE
@@ -156,12 +156,10 @@ class StateTrie:
             return False
         # Initiate swap
         updatedSender = accSender.update(nonce=True, balance=(accSender.balance - tx.value - tx.fee))
-        print(f"NONCE PREtransfer {accSender.nonce} and POSTtransfer {updatedSender.nonce}")
         updatedRec = accBenef.update(balance=(accBenef.balance + tx.value))
         # Record changes
         self.updateAccount(tx.sender, updatedSender)
         self.updateAccount(tx.to, updatedRec)
-        print(f"Actually yeah (sender nonce = {self.getAccount(tx.sender).nonce})")
         return True
 
     def verifyMetaTX(self, meta: TxMeta) -> bool:

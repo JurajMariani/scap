@@ -1,5 +1,4 @@
 from multiprocessing import Queue
-import pickle
 
 class Postman:
     '''

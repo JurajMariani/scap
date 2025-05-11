@@ -14,12 +14,19 @@ class Peer(Serializable):
         ('port', Binary.fixed_length(4))
     ]
 
-    def set(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.reader: StreamReader | None = None
         self.writer: StreamWriter | None = None
 
+    def __hash__(self):
+        return hash(self.id.decode('ascii'))
+    
+    def __eq__(self, other):
+        return isinstance(other, Peer) and self.id == other.id
+
     def getId(self) -> str:
-        return self.id.decode()
+        return self.id.decode('ascii')
     
     @classmethod
     def create(cls, id: str, host: str, port: int) -> Peer:

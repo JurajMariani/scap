@@ -262,14 +262,14 @@ class BlockSerializable(Serializable):
         if (randao_constant == 0):
             return False
         # Construct message
-        message = self.int_to_minimal_bytes(randao_constant) + self.int_to_minimal_bytes(self.block_number)
+        message = bytes.fromhex(randao_constant) + self.int_to_minimal_bytes(self.block_number)
         message = keccak(message)
         signature = keys.Signature(self.randao_reveal)
         pk = keys.PublicKey(benefBLS)
         # Verify signature
         return signature.verify_msg_hash(message, pk)
     
-    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int) -> tuple[StateTrie, bool]:
+    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int, rSeed: bytes) -> tuple[StateTrie, bool]:
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
             return (state, False)
@@ -286,6 +286,9 @@ class BlockSerializable(Serializable):
             return (state, False)
         # Verify assigned epoch
         # TODO
+        # Verify randao randomness seed
+        if (rSeed != self.randao_seed):
+            return (state, False)
         # Verify randao_reveal
         if (not self.verifyRandao(benef.validator_pub_key)):
             return (state, False)
@@ -358,7 +361,7 @@ class BlockSerializable(Serializable):
         try:
             res = self.getStateAfterExecution(state, currReward)
         except Exception as e:
-            print("WATAFUK: ", e)
+            print(e)
         # In case of incorrect TXs
         if not res[1]:
             return (state, False)
@@ -371,7 +374,7 @@ class BlockSerializable(Serializable):
             # 6. IF NONMATCHING ROOTHASH
             #   7. Discard Changes (new final state is orig)
             return (state, False)
-        print("State match")
+        # print("State match")
         # 6. IF MATCHING ROOTHASH
         #   7. Apply Changes (new final state is tmp)
         return (res[0], True)
@@ -397,7 +400,6 @@ class BlockSerializable(Serializable):
             sig = keys.Signature(vrs=(att.v, att.r, att.s))
             pk = sig.recover_public_key_from_msg_hash(attns.hash())
             if pk.to_canonical_address() != att.sender:
-                print(pk.to_canonical_address(), att.sender)
                 return False
         # Verify positive attestation count
         if positiveVerdicts < state.getValidatorSupermajorityLen():

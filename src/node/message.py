@@ -37,9 +37,9 @@ class MessageHeader(Serializable):
 
     def toDict(self) -> dict:
         return {
-            'id': self.id.decode(),
-            'type': self.type.decode(),
-            'subtype': self.subtype.decode(),
+            'id': self.id.decode('ascii'),
+            'type': self.type.rstrip(b"\x00").decode('ascii'),
+            'subtype': self.subtype.rstrip(b"\x00").decode('ascii'),
             'sender': self.sender,
             'payload_length': int.from_bytes(self.payload_length, byteorder='big')
         }
@@ -90,5 +90,5 @@ class Message(Serializable):
         return encode(self)
     
     @classmethod
-    def deserialize(cls, msg: bytes) -> Message:
+    def ddeserialize(cls, msg: bytes) -> Message:
         return decode(msg, Message)

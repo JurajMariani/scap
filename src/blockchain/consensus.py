@@ -83,5 +83,10 @@ class PoSC:
         if self.getLeader() != bl.beneficiary:
             return (state, False)
         # Validate block
-        return bl.verifyBlock(state, parentHash, parentBNumber, cRew)
+        # print(self.randao.seed)
+        return bl.verifyBlock(state, parentHash, parentBNumber, cRew, self.randao.get_seed())
+    
+    # randao seed 
+    # b'\xb3do\x89\x02\xa9=\xae\x9f\x95"\xffo\xfa\x8a\x82\x94+\x89}W\xa6\xec_\xfd\x00A\xe6#\xf3i4'
+    # b'\xb3do\x89\x02\xa9=\xae\x9f\x95"\xffo\xfa\x8a\x82\x94+\x89}W\xa6\xec_\xfd\x00A\xe6#\xf3i4'
         
