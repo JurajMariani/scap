@@ -7,11 +7,11 @@
     },
     "sc_constants": {
         "def_passive_sc": 10,
-        "domain_randao": 33554432,
-        "scaling": "log"
+        "domain_randao": "02000000",
+        "scaling": "root"
     },
     "constraints": {
-        "tx_limit": 10,
+        "tx_limit": 5,
         "replacement_tx_fee_multiplier": 5
     },
     "consensus": {
@@ -20,10 +20,46 @@
     },
     "network": {
         "port": "8400",
-        "endpoints": {
-            "add_validator": "/saf..."
-        },
         "max_messages_kept": 10000,
-        "max_peers": 10
-    }
+        "max_peers": 35,
+        "active_redraw_time": 60
+    },
+    "genesis": {
+        "parent_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "block_number": 0,
+        "coinbase": "0000000000000000000000000000000000000000",
+        "alloc": [
+            {
+                "address": "665e032d9166622dd16f4339df9b7a653e57ea9b",
+                "balance": "16345785D8A0000"
+            },
+            {
+                "address": "8bfc19d41d510630ab54b91292ee3caa0dbf3884",
+                "balance": "7A120",
+                "sc": 500,
+                "id_hash": "c1b832586b0982089a278742260bd17fed1507014af7277139c7f9457ac64e84",
+                "pub_key": "4660e1d337d0e5e67fe265eab64fe5ae15585d3ffa678f8e8b0a09656845d1fde8e2192b8d625932b30202cdd84b4de053ab0fea965f0f3ccf2b65392d1caf5b",
+                "soc_media": "Life"
+            }
+        ],
+        "timestamp": 0
+    }, 
+    "runtime": {
+        "debug_mode": true,
+        "store_vcs": true,
+        "nodes": {
+            "consensus": 5,
+            "verifier": 3,
+            "light": 2
+        }
+    },
+    "zkp_issuers": [
+        {
+            "issuer_id": "did:web:gov.example.org",
+            "pub_key": [
+                1234567890123456789012345678901234567890,
+                9876543210987654321098765432109876543210
+            ]
+        }
+    ]
 }
