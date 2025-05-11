@@ -81,3 +81,10 @@ cython_debug/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Logs
+*.log
+
+# TMP zips
+*.zip
+
