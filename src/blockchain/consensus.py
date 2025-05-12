@@ -55,6 +55,7 @@ class PoSC:
         self.leader = None
         # Get the randomness from Randao
         rngv = self.randao.getValue()
+        print(f'[CONSENSUS]: Random value from RANDAO: [{rngv}].', flush=True)
         # Update the list of validators
         if not self.updateValidatorList(state):
             return None

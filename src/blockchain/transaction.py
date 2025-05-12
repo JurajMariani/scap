@@ -61,7 +61,7 @@ class TxMetaNoSig(Serializable):
     def sign(self, privK: bytes) -> TxMeta:
         sk = keys.PrivateKey(privK)
         sig = sk.sign_msg_hash(self.hash())
-        return TxSerializable(
+        return TxMeta(
             self.forwarder,
             self.sender,
             self.to,

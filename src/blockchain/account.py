@@ -45,7 +45,8 @@ class AccSerializable(Serializable):
     ]
 
     def isVerified(self) -> bool:
-        if (self.id_hash in (None, b'') or self.vc_zkp in (None, b'')):
+        print(f'[NONE]: IsVerified? {self.id_hash}:{self.vc_zkp}', flush=True)
+        if (self.id_hash in (None, b'\x00' * 32) or self.vc_zkp in (None, b'\x00' * 288)):
             return False
         return True
 

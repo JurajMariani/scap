@@ -9,7 +9,7 @@ import os
 from tests.factory import Adam, Eve, rand
 
 class Bootstrapper:
-    def __init__(self, ip: str, port: int, adam = True, peerlist: list[Peer] = [], nodeId: str = ''):
+    def __init__(self, ip: str, port: int, adam = True, peerlist: list[Peer] = [], nodeId: str = '', style: int = 0):
         self.c = Adam() if adam else rand()
         # print(self.c[0][0].to_bytes().hex(), self.c[0][1].to_bytes().hex(), self.c[0][1].to_canonical_address().hex())
         # print(self.c[1].id_hash.hex())
@@ -25,6 +25,7 @@ class Bootstrapper:
         self.port = port
         self.peerList = peerlist
         self.nodeId = nodeId
+        self.playStyle = style
         atexit.register(self.cleanup)
         self.wipeStorage()
 
@@ -44,7 +45,7 @@ class Bootstrapper:
 
     def start(self):
         self.node = Node(self.bridge_p2p, self.ip, self.port, self.peerList, self.nodeId)
-        self.blockchain = Blockchain(self.bridge_bc, self.c[1], sk=self.c[0][0].to_bytes())#, self.c[0][1].to_canonical_address(), self.c[0][0].to_bytes(), self.c[4], self.c[3])
+        self.blockchain = Blockchain(self.bridge_bc, self.c[1], sk=self.c[0][0].to_bytes(), playStyle=self.playStyle)#, self.c[0][1].to_canonical_address(), self.c[0][0].to_bytes(), self.c[4], self.c[3])
         # Launch processes
         p_node = Process(target=self.node.start)
         p_blockchain = Process(target=self.blockchain.start)

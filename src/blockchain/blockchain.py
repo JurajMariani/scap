@@ -19,7 +19,7 @@ import traceback
 import random
 
 class Blockchain:
-    def __init__(self, bridge: Postman, address: bytes, sk: bytes = b'', acc: AccSerializable | None = None, genesis: BlockSerializable | None = None, sts: StateTrie | None = None):
+    def __init__(self, bridge: Postman, address: bytes, sk: bytes = b'', acc: AccSerializable | None = None, genesis: BlockSerializable | None = None, sts: StateTrie | None = None, playStyle: int = 0):
         g = Genesis()
         self.gettingReady = True
         self.chain: BlockSerializable | None = g.constructGenesisBlock()
@@ -34,8 +34,10 @@ class Blockchain:
         self.slashingList = []
         self.badNonces: list[int] = []
         self.nonce = 0
+        self.forwarder = 0
         self.waiting = False
         self.consensus_reached = False
+        self.peerAddresses: set[tuple[bytes, str]] = []
         if not sk:
             self.secretKey = keys.PrivateKey(urandom(32))
         else:
@@ -48,6 +50,9 @@ class Blockchain:
         self.shutdownEvent = asyncio.Event()
         self.middleware.send(RPC.constructRPC('/getNodeID', []))
         self.nodeId = ''
+        # TODO
+        # For testing purposes
+        self.playStyle = playStyle
         # print("Blockchain INIT")
 
     def setAccount(self, acc: AccSerializable) -> None:
@@ -58,6 +63,12 @@ class Blockchain:
         if self.state.getAccount(self.address) is None:
             self.state.addAccount(acc, self.address)
         self.nonce = acc.nonce
+
+    def getNodeIdFromRecipient(self, recp) -> str | None:
+        for n in list(self.peerAddresses):
+            if n[0] == recp:
+                return n[1]
+        return None
 
     def updateAccount(self) -> None:
         self.account = self.state.getAccount(self.address)
@@ -89,6 +100,10 @@ class Blockchain:
 
     def recvAttestation(self, at: Attestation) -> None:
         print(f"[{self.nodeId}]: ATTESTATION RECEIVED")
+        if self.newBlock is None:
+            self.attestationList.append(at)
+            print(f'[{self.nodeId}]: But no block.', flush=True)
+            return
         # Validate Attestation
         # Sender is a validator
         add = at.recoverAddress()
@@ -98,6 +113,7 @@ class Blockchain:
         if not at.verifySig():
             self.slash(add)
             return
+        print(f'[{self.nodeId}]: ATTESTATIONS: {self.attestationList}, New Block Present? {True if self.newBlock else False}')
         # Attestation should match current block or past blocks
         if at.block_hash != self.newBlock.rebuildHash():
             if at.block_hash in self.getPastBlockHashList():
@@ -145,9 +161,10 @@ class Blockchain:
                     if t.eq(tt):
                         self.mempool.remove(t)
                         skip = True
-                    else:
-                        print("NOT EQUAL")
-            print(f"[{self.nodeId}]:CONSENSUS REACHED, keeping block")
+                    #else:
+                    #    print("NOT EQUAL")
+            print(f"[{self.nodeId}]: CONSENSUS REACHED, keeping block")
+            print(f'[{self.nodeId}]: There are {self.state.getValidatorLen()} validators: {self.state.getValidators()}')
             self.consensus_reached = True
         else:
             # Negative supermajority is reached
@@ -212,11 +229,15 @@ class Blockchain:
         return
     
     def reassignRequest(self, txm: TxMeta) -> None:
-        pass
+        # Validate TxMeta on arrival
+        st = self.state.clone()
+        if st.verifyMetaTX(txm):
+            # For simplicity's sake, we accept every request
+            self.generateTX(1, random.randint(1000, 2000), b'', 0, txm.sserialize(), MetaTX=True)
     
     def generateReassign(self, recp: bytes, value: int) -> TxMeta:
         return TxMetaNoSig(
-            self.account.forwarder,
+            self.forwarder,
             self.address,
             recp,
             int(time.time()),
@@ -235,12 +256,13 @@ class Blockchain:
         for medium in media:
             mediaList.append(AffiliateMedia(
                 b'\x01' if medium[0] else b'\x00',
-                bytes(medium[1], 'utf-8'),
+                medium[1].encode('utf-8'),
                 medium[2]
             ))
+        print(f'[{self.nodeId}]: AFF list: {mediaList}')
         return encode(AffiliateMediaList(
-            validator_pub_key,
-            mediaList
+            mediaList,
+            validator_pub_key
         ))
     
     def generateReplacementTx(self) -> TxSerializable | None:
@@ -255,8 +277,9 @@ class Blockchain:
                 return ntx.update(type=4)
         return None
     
-    def generateTX(self, type: int, fee: int, recp: bytes, value: int, data: bytes = b'', **kwargs) -> None:
+    def generateTX(self, type: int, fee: int, recp: bytes, value: int, data: bytes = b'', **kwargs) -> bool:
         # Create a placeholder TX
+        tmpState = self.state.clone()
         txData = data
         # Decide on TX based on TxType
         if type == 1:
@@ -270,22 +293,39 @@ class Blockchain:
             if (('MetaTX' not in kwargs.keys()) or not kwargs['MetaTX']):
                 # Construct, Sign and Send MetaTX
                 txm = self.generateReassign(recp, value)
-                self.middleware.send(RPC.constructRPC('/txm', [Param.constructParam('txm', 6, txm.sserialize())]))
+                self.forwarder += 1
+                if not tmpState.verifyMetaTX(txm):
+                    self.forwarder -= 1
+                    return False
+                resp = RPC.constructRPC('/txm', [Param.constructParam('txm', 6, txm.sserialize())])
+                resp.senderId = self.getNodeIdFromRecipient(recp)
+                resp.xclusive = True
+                if not resp.senderId:
+                    return False
+                self.middleware.send(resp)
+                return True
         elif type == 2:
             # Register
             # Fill data with registerData serialized
-            if (('id_hash' not in kwargs.keys()) or ('vc_zkp' not in kwargs.keys(0))):
-                return None
+            if (('id_hash' not in kwargs.keys()) or ('vc_zkp' not in kwargs.keys())):
+                return False
             if not isinstance(kwargs['id_hash'], bytes) or not isinstance(kwargs['vc_zkp'], bytes):
-                return None
+                return False
             txData = self.generateRegisterData(kwargs['id_hash'], kwargs['vc_zkp'])
         elif type == 3:
             # SocMedia Register
             # Fill data with AffiliateMediaList serialized
             if (('validator_pub_key' not in kwargs.keys()) or ('media' not in kwargs.keys())):
-                return None
-            if not isinstance(kwargs['validator_pub_key'], bytes) or not isinstance(kwargs['media'], list[tuple[bool, str, bytes]]):
-                return None
+                print(f'[{self.nodeId}]: VAL_PUB_KEY/MEDIA missing.', flush=True)
+                return False
+            if not isinstance(kwargs['validator_pub_key'], bytes) or not isinstance(kwargs['media'], list) or not all(isinstance(item, tuple) and
+                    len(item) == 3 and
+                    isinstance(item[0], bool) and
+                    isinstance(item[1], str) and
+                    isinstance(item[2], bytes)
+                    for item in kwargs['media']):
+                print(f'[{self.nodeId}]: VAL_PUB_KEY/MEDIA not the right types.', flush=True)
+                return False
             txData = self.generateAffMediaList(kwargs['validator_pub_key'], kwargs['media'])
         elif type == 4:
             # Replacement TX
@@ -314,11 +354,11 @@ class Blockchain:
             if not self.state.transaction(ttx, True, False):
                 print(f'[{self.nodeId}][genTX]: Transaction discarded')
                 self.nonce -= 1
-                return
+                return False
         except Exception as e:
             print(f"[{self.nodeId}]: EXCEPTION: {e}", flush=True)
         self.middleware.send(RPC.constructRPC('/tx', [Param.constructParam('tx', 5, ttx.sserialize())]))
-        return
+        return True
 
     def recvTx(self, tx: TxSerializable) -> None:
         # print("Called recvTX")
@@ -345,7 +385,8 @@ class Blockchain:
         # TODO NONCE
         # TODO Every TX with nonce greater/equal to account nonce is correct,
         # TODO if not execute=True
-        if self.state.transaction(txn, True, False):
+        print(f'[{self.nodeId}]: ????HMMMM???? {type(self.state)}', flush=True)
+        if self.state.transaction(txn, verify=True, execute=False):
             self.mempool.append(txn)
             print(f"[{self.nodeId}]: Successfully added to mempool")
         # Else, discard
@@ -364,7 +405,7 @@ class Blockchain:
         pass
 
     def recvBlock(self, bl: BlockSerializable) -> Attestation | None:
-        # print("BLOCK RECEIVED")
+        print(f"[{self.nodeId}]: BLOCK RECEIVED {bl}")
         self.newBlock = bl
         # Validate block on consensus layer
         ret = self.cProt.attest(self.state, self.chain.rebuildHash(), self.chain.block_number, self.getReward(), bl)
@@ -387,7 +428,11 @@ class Blockchain:
                     b'\x01' if ret[1] else b'\x00'
                 )
                 at = atns.sign(self.secretKey.to_bytes())
+                print(f'[{self.nodeId}]: ISSUING {"POSITIVE" if ret[1] else "NEGATIVE"} ATTESTATION.', flush=True)
                 self.middleware.send(RPC.constructRPC('/attestation', [Param.constructParam('at', 7, at.sserialize())]))
+        #for at in self.attestationList:
+        #    if at.block_hash != self.newBlock.rebuildHash():
+        #        self.recvAttestation(at)
         return None
 
     def pushBlock(self, bll: list[Param]):
@@ -395,6 +440,8 @@ class Blockchain:
         # TODO
         # print("Pushblock, GOT:", bll)
         if not bll or bll[0].value == b'':
+            acc = self.state.getAccount(self.address)
+            self.account = acc if acc else AccSerializable.blank()
             self.gettingReady = False
             # print("NOWORKRETUREN")
             return
@@ -419,6 +466,9 @@ class Blockchain:
             self.chain = nBlock
             self.state = nstate[0]
             self.cProt.randao.reseed(self.chain.randao_seed)
+        
+        acc = self.state.getAccount(self.address)
+        self.account = acc if acc else AccSerializable.blank()
         self.gettingReady = False
         # print("WHOOOOOOOA")
             # Continue to the next block
@@ -465,8 +515,68 @@ class Blockchain:
             await asyncio.sleep(4)
             if self.gettingReady:
                 continue
-            print(f"[{self.nodeId}]: USER: generating TX")
-            self.generateTX(0, random.randint(0, 1500), b'\x10' * 20, 1000)
+            if (len(self.peerAddresses) == 0):
+                continue
+            try:
+                if self.playStyle == 0:
+                    # This style only sends TXs
+                    to = random.sample(self.peerAddresses, 1)[0][0]
+                    self.peerAddresses = set(self.peerAddresses)
+                    print(f"[{self.nodeId}]: USER: generating TX to [{to.hex()}]")
+                    self.generateTX(0, random.randint(0, 1500), to, 10000)
+                if self.playStyle in (1, 2, 7, 8, 9, 10):
+                    # This style gossips a registration Tx
+                    # Then waits until it is in a block
+                    # Then distributes SC
+                    # Then sneds notmal Txs
+                    if (self.state.getAccount(self.address).isVerified()):
+                        if self.playStyle in (7, 8):
+                            print(f'[{self.nodeId}]: [genTX]: Account has been verified!!!', flush=True)
+                            # Find a validator capable of receiving SC
+                            print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
+                            recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
+                            # Generate MetaTX of SC assignment
+                            if not self.generateTX(1, 0, recp, 5):
+                                continue
+                            if self.playStyle == 7:
+                                self.playStyle = 0
+                            else:
+                                print(f'[{self.nodeId}]: Setting style from [{self.playStyle}] to [9].', flush=True)
+                                self.playStyle = 9
+                        else:
+                            if self.playStyle != 10:
+                                # Generate Soc Media TX
+                                print(f'[{self.nodeId}]: [genTX]: Style {self.playStyle}, generating type 3.', flush=True)
+                                if not self.generateTX(3, random.randint(1000, 2000), b'', 0, b'', validator_pub_key=self.pubk.to_bytes(), media=[(True, 'YouTube', b'\x10' * 288)]):
+                                    print(f'[{self.nodeId}]: [genTX]: Something happened for type 3.', flush=True)
+                                    continue
+                                else:
+                                    self.playStyle = 10
+                            else:
+                                if not self.state.getValidator(self.address):
+                                    continue
+                                else:
+                                    print(f'[{self.nodeId}]: I AM A VALIDATOR :sunglasses emoji:')
+                                    self.playStyle = 0
+                                    print(f'[{self.nodeId}]: [genTX]: Setting style to 0 - {self.playStyle}.', flush=True)
+
+                    else:
+                        if self.playStyle not in (7, 8):
+                            print(f'[{self.nodeId}]: [genTX]: preRegister', flush=True)
+                            if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=b'\x10'*288):
+                                continue
+                            print(f'[{self.nodeId}]: [genTX]: postRegister', flush=True)
+                            if self.playStyle == 1:
+                                self.playStyle = 7
+                            else:
+                                print(f'[{self.nodeId}]: [genTX]: Setting style to 8.', flush=True)
+                                self.playStyle = 8
+
+# BlockSerializable(parent_hash=b'H\x138v\xf6\xdcE\x7f1\x08\xf6\xbf\xfc \x9f\xbd\x8b\xf0`n\x97\x05\xd0\x99\xcf\x9c\xcb/6\xf2\xff)', state_root=b'\xf0|\xd8\x96\xf9\x10\x94\xd7w\xc0\x08\xc5$\xb3\xd76\x1bb\x0c\x94\xa9\xe6\xc8z8\xc9\xc39\x83@^P', transactions_root=b"\xd3.\x98\xc2wXW\x1d\x03\x1a\xd6\xb1^'\xbc\xf3\xa7S:\xce\x90\xd3u\xce\x1b\xd3h\xf0\xb5\xd6\xdb\x96", attestations_root=b"\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", receipts_root=b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', epoch_number=0, block_number=1, randao_reveal=b'\xbb/\xa9\xe7\x80\x86YB\x0b\xde\x15\xedN\xc2\xd0\x90|\xe1\xdc\x85\\\x8a\xcc\x05A\x97\xd8\xad\xd0\x02\x01\xb8\x11\x94\x87L\xda<fD\x03\x8e\x0fYw\xd7\xb9tBA:\xb5\xe0-\xe4d|A|C\x06\xca3^\x01', randao_seed=b'\x00', beneficiary=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', timestamp=1747056311, sig_v=1, sig_r=39982920287527697783335693781090821103642387430224504891618268610284025687319, sig_s=48000689032208177769465337186323675556866325199611619492687995999218450658109, data=b'', transactions=(TxSerializable(nonce=0, type=0, fee=1003, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056290, data=b'', v=1, r=97002484183267719760991897808404123263486833262677495044139201273440516512907, s=29692514204150938973460397411460477373447492408132867519384590201803034437385), TxSerializable(nonce=1, type=0, fee=905, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056294, data=b'', v=1, r=70318301139114886979823939533574425134083299656563170061899609605681988843700, s=35141926362186345520198511962782870215218420452510788876210053605227576553261), TxSerializable(nonce=2, type=0, fee=652, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056298, data=b'', v=1, r=106162852652452073661339414748185419327624573366803171157769666824995684689542, s=51064812645936514111524761255195089598087754823317502113228879079757433628770), TxSerializable(nonce=3, type=0, fee=1012, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056302, data=b'', v=0, r=1418407079623880751859391599015542361576698396923465278818457659036260549325, s=42302537586179422804312985062242589634447345721028001029991976689797993592929), TxSerializable(nonce=4, type=0, fee=593, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056306, data=b'', v=1, r=47424605764677307055742008560370012955487540274907545826470722569888542863713, s=9765453466824945638908139698327387661931055674112314335113840189153552326098)), attestations=())
+
+            except Exception as e:
+                print(f'[{self.nodeId}]: [UserInput]: [Style: {self.playStyle}] ERROR HAPPENED: {e}', flush=True)
+                traceback.print_exc()
 
     async def listenToNetwork(self):
         while not self.shutdownEvent.is_set():
@@ -502,6 +612,16 @@ class Blockchain:
         elif procCall == '/setNodeID':
             self.nodeId = msg.params[0].value.decode('utf-8')
             print("Node ID set:", self.nodeId)
+        elif procCall == '/getAddress':
+            resp = RPC.constructRPC('/setAddress', [Param.constructParam('addr', 3, self.address)])
+            resp.senderId = msg.senderId
+            self.middleware.send(resp)
+        elif procCall == '/setAddress':
+            if (self.address == msg.params[0].value):
+                return
+            print(f'[{self.nodeId}]: [BL]: Registering peer [{msg.senderId}] address [{msg.params[0].value.hex()}]')
+            self.peerAddresses = set(self.peerAddresses)
+            self.peerAddresses.add((msg.params[0].value, msg.senderId))
         return
 
     async def gameplayLoop(self):

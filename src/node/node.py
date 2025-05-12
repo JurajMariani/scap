@@ -89,6 +89,9 @@ class Node:
                     # print("Got no one to get blocks from.")
                     self.middleware.send(RPC.constructRPC('/pushBlock', []))
                     continue
+                if (msg.procedure.decode('ascii') == '/setAddress'):
+                    print(f'[{self.node.getId()}]: Sending SetADDRESS to peer [{msg.senderId}]', flush=True)
+                    await self.send(msg, 'PeerOlleh', 'x', msg.senderId)
                 if (msg.senderId is not None):
                     await self.send(msg, '', 'x' if msg.xclusive else '', msg.senderId, [self.node] if msg.senderId != '' else None)
                 else:
@@ -194,6 +197,10 @@ class Node:
         # Strore reader and writer of Peer
         sender.reader = reader
         sender.writer = writer
+
+        fstPeerHello = False
+        if (sender.getId() not in self.peerIds):
+            fstPeerHello = True
         self.addPeer(sender)
         # print(f'[{self.node.getId()}]: I have {len(self.activePeers)}/{len(self.peers)} peers: ({self.getActiveIds()})', flush=True)
         
@@ -211,9 +218,14 @@ class Node:
         if msgType == "PeerHello":
             if sender.getId() == self.node.getId():
                 return
-            # print(f"[{self.node.getId()}]: Recvd PeerHello from peer {mmsg['header']['sender'].getId()}", flush=True)
+            if fstPeerHello:
+                await self.sendMessage(self.getPeerHello(), sender, [self.peers.difference({sender})])
+            query = RPC.constructRPC('/getAddress', [])
+            query.senderId = sender.getId()
+            self.middleware.send(query)
+            print(f"[{self.node.getId()}]: Recvd PeerHello from peer {mmsg['header']['sender'].getId()}", flush=True)
             # Respond with courtesy
-            await self.sendMessage(self.getPeerOlleh(), sender, [self.node])
+            # await self.sendMessage(self.getPeerOlleh(), sender, [self.node])
         elif msgType == "GetPeers":
             pass
             #self.sendMessage(self.getPeerMessage('SetPeers', encode(list(self.peers))), sender)

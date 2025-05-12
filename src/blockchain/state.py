@@ -1,3 +1,4 @@
+from __future__ import annotations
 from trie import HexaryTrie
 from eth_keys import keys
 from eth_utils import keccak
@@ -25,6 +26,16 @@ class StateTrie:
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
 
+    
+    def clone(self) -> StateTrie:
+        st = StateTrie()
+        st.db = self.db.copy()
+        st.valAddrList = self.valAddrList.copy()
+        st.iddb = self.iddb.copy()
+        st.state_trie = HexaryTrie(st.db, self.getRootHash())
+        st.id_trie = HexaryTrie(st.iddb, self.id_trie.root_hash)
+        return st
+
     def transaction(self, tx: TxSerializable, verify: bool = True, execute: bool = True) -> bool:
         type = tx.type
         if type == 0:
@@ -37,6 +48,7 @@ class StateTrie:
             # Registration
             return self.register(tx, verify, execute)
         elif type == 3:
+            print('[STATE]: PROCESSING AFFILIATE', flush=True)
             # Register affiliate social media
             return self.affiliate(tx, verify, execute)
         else:
@@ -71,9 +83,13 @@ class StateTrie:
         del self.state_trie[key]
 
     def getValidator(self, address: bytes) -> bool:
-        return address in self.valAddrList
+        if isinstance(address, str):
+            raise TypeError("addValidator accepts bytes")
+        return address in self.valAddrList.keys()
 
     def addValidator(self, address: bytes, sc: int) -> None:
+        if isinstance(address, str):
+            raise TypeError("addValidator accepts bytes")
         self.valAddrList[address] = sc
 
     def removeValidator(self, address: bytes) -> None:
@@ -174,7 +190,7 @@ class StateTrie:
         if (not metaSender.isVerified()):
             return False
         # Check timestamp
-        if (meta.timestamp > int(time.time)):
+        if (meta.timestamp > int(time.time())):
             return False
         # Check meta sender forwarder nonce
         if (metaSender.forwarder != meta.forwarder):
@@ -294,18 +310,21 @@ class StateTrie:
         else:
             return False
         
+        print(f'[STATE]: "{tx.sender}" has {scBeneficiary.active_sc} social capital NOW.')
         scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList, balance=(scSender.balance - tx.fee))
+        print(f'[STATE]: "{tx.sender}" has {scBeneficiaryUpdate.active_sc} social capital NOW.')
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)
         # Add SC to verifier
         # Called add but functions similarly to update
-        self.addValidator(tx.sender, scSender.active_sc + metaTx.sc)
+        self.addValidator(tx.sender, scBeneficiaryUpdate.active_sc)
         return True
     
-    def verifyRegister(self, tx:TxSerializable, execute: bool) -> bool:
+    def verifyRegister(self, tx: TxSerializable, execute: bool) -> bool:
+        sender = self.getAccount(tx.sender)
         # Verify common TX elements
-        if (not self.verifyTX(tx, execute)):
+        if (not self.verifyTX(tx, sender, execute)):
             return False
         # Verify data field
         d = decode(tx.data, RegisterData)
@@ -333,9 +352,9 @@ class StateTrie:
         regd = decode(tx.data, RegisterData)
         # Load default passive_sc value
         passSc = 0
-        with open('../config/config.json') as f:
+        with open('config/config.json') as f:
             config = json.load(f)
-            passSc = config['sc_constrants']['def_passive_sc']
+            passSc = config['sc_constants']['def_passive_sc']
         if passSc == 0:
             return False
         # Initiate change
@@ -343,38 +362,25 @@ class StateTrie:
         # Check TX nonce
         if accSender.nonce != tx.nonce:
             return False
-        accUpdated = AccSerializable(
-            accSender.nonce + 1,
-            accSender.forwarder,
-            accSender.balance - tx.fee,
-            regd.id_hash,
-            regd.vc_zkp,
-            passSc,
-            0,
-            0,
-            b'',
-            [],
-            [],
-            [],
-        )
+        accUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), id_hash=regd.id_hash, vc_zkp=regd.vc_zkp, passive_sc=passSc)
         self.updateAccount(tx.sender, accUpdated)
         return True
     
     def verifyAffiliate(self, tx: TxSerializable, execute: bool) -> bool:
+        acc = self.getAccount(tx.sender)
         # Verify common TX elements
-        if (not self.verifyTX(tx, execute)):
+        if (not self.verifyTX(tx, acc, execute)):
             return False
         # Verify data field
         d = decode(tx.data, AffiliateMediaList)
         if not d.media:
             return False
-        if d.validator_pub_key == b'':
-            return False
         # Verify validator_pub_key
         # if already present in account
-        acc = self.getAccount(tx.sender)
         if (acc.validator_pub_key):
             if (acc.validator_pub_key != d.validator_pub_key):
+                if acc.validator_pub_key == b'\x00' * 64:
+                    return True
                 return False
         return True
     
@@ -399,6 +405,7 @@ class StateTrie:
         affList = list(affMediaList.media)
         accSender = self.getAccount(tx.sender)
         socAccs = list(accSender.soc_media)
+        print(f"[STATE]: socAccs: {socAccs}.", flush=True)
         # Check TX nonce
         if accSender.nonce != tx.nonce:
             return False
@@ -410,6 +417,7 @@ class StateTrie:
                 # Check for duplicates
                 if (self.findMediaInAffiliateList(socAccs, aff.media) >= 0):
                     # Duplicate found
+                    print(f'[STATE]: HEEEEEEEEEREEEEEEEE IS DUPLICATE - {socAccs} vs {aff.media}', flush=True)
                     return False
                 else:
                     # No duplicates
@@ -418,20 +426,24 @@ class StateTrie:
                     # ZKP Verificatin for soc media ownership is currently unsupported
                     # TODO
                     # ADD
-                    socAccs = socAccs.append(aff)
+                    print(f'[STATE]: Appending {aff} to {socAccs}.', flush=True)
+                    socAccs.append(aff)
+                    print(f'[STATE]: Appended: {socAccs}.', flush=True)
             else:
                 # Remove media
                 # Check SM existance
                 idx = self.findMediaInAffiliateList(socAccs, aff.media)
                 if (idx < 0):
                     # Can't remove nonexistent affiliation
+                    print('[STATE]: HEEEEEEEEEREEEEEEEE IS REMOVE NONEXISTENT', flush=True)
                     return False
                 else:
                     del socAccs[idx]
         # Initiate changes
-        accSenderUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), validator_pub_key=affList.valudator_pub_key, soc_media=socAccs)
+        accSenderUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), validator_pub_key=affMediaList.validator_pub_key, soc_media=socAccs)
         # Update Account
         self.updateAccount(tx.sender, accSenderUpdated)
+        print(f'[STATE]: Updating [{tx.sender.hex()}], adding {socAccs} to account.')
         # Register account as a validator
         if (len(socAccs)):
             if (not self.getValidator(tx.sender)):

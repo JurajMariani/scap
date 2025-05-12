@@ -42,13 +42,13 @@ class Genesis:
             st.addAccount(AccSerializable.blank().update(balance=to_int(a['balance'].encode('ascii'))), bytes.fromhex(a['address']))
             acc = st.getAccount(bytes.fromhex(a['address']))
             if a.get('id_hash'):
-                acc = acc.update(id_hash=bytes.fromhex(a['id_hash']))
+                acc = acc.update(id_hash=bytes.fromhex(a['id_hash']), vc_zkp=b'\x10'*288)
             if a.get('pub_key'):
                 acc = acc.update(validator_pub_key=bytes.fromhex(a['pub_key']))
             if a.get('sc'):
                 acc = acc.update(active_sc=a['sc'])
             if a.get('soc_media'):
-                acc = acc.update(soc_media=[AffiliateMedia(b'\x01', a['soc_media'].encode('ascii'), b'\x00' * 288)])
+                acc = acc.update(soc_media=[AffiliateMedia(b'\x01', a['soc_media'].encode('ascii'), b'\x10' * 288)])
                 st.addValidator(bytes.fromhex(a['address']), a['sc'])
             st.updateAccount(bytes.fromhex(a['address']), acc)
         return st
