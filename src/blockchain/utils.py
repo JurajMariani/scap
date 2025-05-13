@@ -1,9 +1,24 @@
 from blockchain.account import AccSerializable, AffiliateMedia
-from blockchain.block import BlockSerializable
+from blockchain.block import BlockSerializable, BlockNoSig
 from blockchain.state import StateTrie
-from node.peer import to_int
+from network.peer import to_int
+from eth_utils import keccak
+from eth_keys import keys
+from os import urandom
 from math import log2
+import time
 import json
+
+
+
+
+
+def chainLog(nodeId: str, nodeProc: bool | None, fnMethod: str, message: str = ''):
+    if nodeProc is not None:
+        np = "NODE" if nodeProc else "BLOCKCHAIN"
+    else:
+        np = "NONE"
+    print(f'[{time.time():.7f}] [{nodeId}] [{np}] [{fnMethod}]]{": " + message if message else message}', flush=True)
 
 
 class Genesis:
@@ -52,3 +67,68 @@ class Genesis:
                 st.addValidator(bytes.fromhex(a['address']), a['sc'])
             st.updateAccount(bytes.fromhex(a['address']), acc)
         return st
+
+    def Eve(self):
+        private_key_bytes = keccak('uzumymv'.encode('ascii'))
+        sk = keys.PrivateKey(private_key_bytes)
+        pk = sk.public_key
+
+        eve = AccSerializable.blank()
+        id = keccak('uzumymv'.encode('ascii'))
+        eve = eve.update(balance=1000000000000000, id_hash=id, passive_sc=50, active_sc=700, validator_pub_key=pk.to_bytes(), soc_media=[AffiliateMedia(b'\x01', 'Heaven'.encode('ascii'), b'\x00' * 288)])
+        #print("FACTORY: user balance", eve.balance)
+        eveAddress = pk.to_canonical_address()
+
+        state = StateTrie()
+        state.addAccount(eve, eveAddress)
+        state.addValidator(eveAddress, 1000)
+        #print(eveAddress.hex())
+
+        return ((sk, pk), eveAddress, eve)
+
+    def rand(self):
+        private_key_bytes = urandom(32)
+        sk = keys.PrivateKey(private_key_bytes)
+        pk = sk.public_key
+        randAddress = pk.to_canonical_address()
+
+        return ((sk, pk), randAddress)
+
+# PK full: a8465308efd1222a99d2b0e96bfea099f02f7e1000da673b07a5bace76836f071a5418870e184aa7aa7530cc1f2da7c875678c4ac05f1029223b1fddc2793fe0
+# Address: 665e032d9166622dd16f4339df9b7a653e57ea9b
+# SK: cb3f5373710ac12cf54a3623c98622548246ede6dd4797ab7ee23493c9d7bba9
+
+    def Adam(self):
+        private_key_bytes = keccak('hesoyam'.encode('ascii'))
+        sk = keys.PrivateKey(private_key_bytes)
+        pk = sk.public_key
+        
+
+        adam = AccSerializable.blank()
+        id = keccak('hesoyam'.encode('ascii'))
+        adam = adam.update(balance=1000000000000000, id_hash=id, passive_sc=50, active_sc=1000, validator_pub_key=pk.to_bytes(), soc_media=[AffiliateMedia(b'\x01', 'Life'.encode('ascii'), b'\x00' * 288)])
+        adamAddress = pk.to_canonical_address()
+        state = StateTrie()
+        state.addAccount(adam, adamAddress)
+        state.addValidator(adamAddress, 1000)
+
+        with open('config/config.json') as f:
+                    config = json.load(f)
+
+        x = config['sc_constants']['domain_randao'].encode('ascii')
+
+        genesis = BlockNoSig(
+            keccak('hesoyam'.encode('ascii')),
+            state.getRootHash(),
+            keccak(b''),
+            keccak(b''),
+            b'\x00' * 32,
+            0,
+            0,
+            sk.sign_msg_hash(x).to_bytes(),
+            urandom(65),
+            adamAddress,
+            int(time.time()),
+            b''
+        ).sign(sk.to_bytes()).addTXandAttLists([], [])
+        return ((sk, pk), adamAddress, adam, state, genesis)

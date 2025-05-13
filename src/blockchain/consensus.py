@@ -3,8 +3,7 @@ from math import sqrt, log2, log10, log
 import json
 
 from blockchain.state import StateTrie
-from blockchain.block import Attestation, AttestationNoSig, BlockSerializable
-from blockchain.account import AccSerializable
+from blockchain.block import Attestation, BlockSerializable
 from blockchain.randao import Randao
 
 class PoSC:
@@ -55,7 +54,7 @@ class PoSC:
         self.leader = None
         # Get the randomness from Randao
         rngv = self.randao.getValue()
-        print(f'[CONSENSUS]: Random value from RANDAO: [{rngv}].', flush=True)
+        # print(f'[CONSENSUS]: Random value from RANDAO: [{rngv}].', flush=True)
         # Update the list of validators
         if not self.updateValidatorList(state):
             return None

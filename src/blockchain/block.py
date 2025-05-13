@@ -110,7 +110,7 @@ class BlockNoSig(Serializable):
                 self.data
             )
         except Exception as e:
-            print("EEEEE", e)
+            print("Exception", e)
         return None
 
 class BlockSig(Serializable):
@@ -344,7 +344,7 @@ class BlockSerializable(Serializable):
         enrichment = int(enrichment)
         # 4. Enrich beneficiary (reward + fees)
         if not tmp.coinbase(benef, enrichment):
-            print("ERROR")
+            # print("ERROR")
             return (state, False)
         return (tmp, True)
     
@@ -370,7 +370,7 @@ class BlockSerializable(Serializable):
         #   but root hashes are different
         #   (Leader could have increased their balance)
         if (self.state_root != res[0].getRootHash()):
-            print("States do not equal")
+            #print("States do not equal")
             # 6. IF NONMATCHING ROOTHASH
             #   7. Discard Changes (new final state is orig)
             return (state, False)

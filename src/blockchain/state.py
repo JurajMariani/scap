@@ -48,7 +48,6 @@ class StateTrie:
             # Registration
             return self.register(tx, verify, execute)
         elif type == 3:
-            print('[STATE]: PROCESSING AFFILIATE', flush=True)
             # Register affiliate social media
             return self.affiliate(tx, verify, execute)
         else:
@@ -142,7 +141,7 @@ class StateTrie:
                 return False
         else:
             if (accSender.nonce != tx.nonce):
-                print("Not EQUAL, should exit")
+                #print("Not EQUAL, should exit")
                 return False
         # Check sender has enough funds to send TX (to pay the fee)
         if (accSender.balance < tx.fee):
@@ -168,7 +167,7 @@ class StateTrie:
         accBenef = self.getAccount(tx.to)
         # Check NONCE
         if accSender.nonce != tx.nonce:
-            print("NONCE DOES NOT MATCH!", accSender.nonce, tx.nonce)
+            # print("NONCE DOES NOT MATCH!", accSender.nonce, tx.nonce)
             return False
         # Initiate swap
         updatedSender = accSender.update(nonce=True, balance=(accSender.balance - tx.value - tx.fee))
@@ -310,9 +309,7 @@ class StateTrie:
         else:
             return False
         
-        print(f'[STATE]: "{tx.sender}" has {scBeneficiary.active_sc} social capital NOW.')
         scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList, balance=(scSender.balance - tx.fee))
-        print(f'[STATE]: "{tx.sender}" has {scBeneficiaryUpdate.active_sc} social capital NOW.')
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)
@@ -405,7 +402,7 @@ class StateTrie:
         affList = list(affMediaList.media)
         accSender = self.getAccount(tx.sender)
         socAccs = list(accSender.soc_media)
-        print(f"[STATE]: socAccs: {socAccs}.", flush=True)
+        
         # Check TX nonce
         if accSender.nonce != tx.nonce:
             return False
@@ -417,7 +414,6 @@ class StateTrie:
                 # Check for duplicates
                 if (self.findMediaInAffiliateList(socAccs, aff.media) >= 0):
                     # Duplicate found
-                    print(f'[STATE]: HEEEEEEEEEREEEEEEEE IS DUPLICATE - {socAccs} vs {aff.media}', flush=True)
                     return False
                 else:
                     # No duplicates
@@ -426,16 +422,13 @@ class StateTrie:
                     # ZKP Verificatin for soc media ownership is currently unsupported
                     # TODO
                     # ADD
-                    print(f'[STATE]: Appending {aff} to {socAccs}.', flush=True)
                     socAccs.append(aff)
-                    print(f'[STATE]: Appended: {socAccs}.', flush=True)
             else:
                 # Remove media
                 # Check SM existance
                 idx = self.findMediaInAffiliateList(socAccs, aff.media)
                 if (idx < 0):
                     # Can't remove nonexistent affiliation
-                    print('[STATE]: HEEEEEEEEEREEEEEEEE IS REMOVE NONEXISTENT', flush=True)
                     return False
                 else:
                     del socAccs[idx]
@@ -443,7 +436,6 @@ class StateTrie:
         accSenderUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), validator_pub_key=affMediaList.validator_pub_key, soc_media=socAccs)
         # Update Account
         self.updateAccount(tx.sender, accSenderUpdated)
-        print(f'[STATE]: Updating [{tx.sender.hex()}], adding {socAccs} to account.')
         # Register account as a validator
         if (len(socAccs)):
             if (not self.getValidator(tx.sender)):

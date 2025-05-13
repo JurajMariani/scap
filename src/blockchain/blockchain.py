@@ -3,10 +3,10 @@ from blockchain.transaction import TxSerializable, TxSerializableNoSig, TxMeta, 
 from blockchain.state import StateTrie
 from blockchain.account import AccSerializable, RegisterData, AffiliateMediaList, AffiliateMedia
 from blockchain.consensus import PoSC
-from blockchain.utils import Genesis
+from blockchain.utils import Genesis, chainLog
 from middleware.middleware import Postman
 from middleware.rpc import Param, RPC
-from node.peer import to_int
+from network.peer import to_int
 from eth_keys import keys
 from eth_utils import keccak
 from rlp import encode, decode
@@ -53,7 +53,10 @@ class Blockchain:
         # TODO
         # For testing purposes
         self.playStyle = playStyle
-        # print("Blockchain INIT")
+        self.log('INIT', 'Blockchain initialized')
+
+    def log(self, fn, msg: str = ''):
+        chainLog(self.nodeId, False, fn, msg)
 
     def setAccount(self, acc: AccSerializable) -> None:
         # Eiter use this fn or pass account in constructor
@@ -81,6 +84,7 @@ class Blockchain:
             f.write(self.chain.sserialize())
         with open('./storage/' + self.nodeId + '_lperfix.txt', 'a') as f:
             f.write(str(len(self.chain.sserialize())) + '\n')
+        self.log('STORE', 'Last block stored to file')
 
     def getPastBlockHashList(self) -> list[bytes]:
         # TODO
@@ -99,10 +103,9 @@ class Blockchain:
         return self.config['currency']['initial_reward'] // (epoch_no + 1)
 
     def recvAttestation(self, at: Attestation) -> None:
-        print(f"[{self.nodeId}]: ATTESTATION RECEIVED")
+        self.log('recvAttestation', 'Attestation Received')
         if self.newBlock is None:
             self.attestationList.append(at)
-            print(f'[{self.nodeId}]: But no block.', flush=True)
             return
         # Validate Attestation
         # Sender is a validator
@@ -113,7 +116,7 @@ class Blockchain:
         if not at.verifySig():
             self.slash(add)
             return
-        print(f'[{self.nodeId}]: ATTESTATIONS: {self.attestationList}, New Block Present? {True if self.newBlock else False}')
+        #print(f'[{self.nodeId}]: ATTESTATIONS: {self.attestationList}, New Block Present? {True if self.newBlock else False}')
         # Attestation should match current block or past blocks
         if at.block_hash != self.newBlock.rebuildHash():
             if at.block_hash in self.getPastBlockHashList():
@@ -134,7 +137,7 @@ class Blockchain:
         # menanig there is no logner an honest supermajority
         # the best coarse of action is to leave the network
         if (self.state.getValidatorLen() - len(self.newAttestationList) + more) < self.state.getValidatorSupermajorityLen():
-            print("Consensus cannot be reached. Terminating...")
+            self.log('recvAttestaton', "Consensus cannot be reached. Terminating...")
             exit(1)
         # If we don't have a supermajority yet
         elif len(self.newAttestationList) < self.state.getValidatorSupermajorityLen():
@@ -146,8 +149,10 @@ class Blockchain:
             # TMP list is wiped
             self.newAttestationList = []
             # Proposed block can be safely added to the chain
+            self.log('recvAttestation', 'State update started')
             self.store()
             self.state = self.newBlock.getStateAfterExecution(self.state, self.getReward())[0]
+            self.log('recvAttestation', 'State update finished')
             #print("THIS ACC NONCE IS", self.state.getAccount(self.address).nonce)
             self.chain = self.newBlock
             self.newBlock = None
@@ -163,14 +168,14 @@ class Blockchain:
                         skip = True
                     #else:
                     #    print("NOT EQUAL")
-            print(f"[{self.nodeId}]: CONSENSUS REACHED, keeping block")
-            print(f'[{self.nodeId}]: There are {self.state.getValidatorLen()} validators: {self.state.getValidators()}')
+            self.log('recvAttestation', "CONSENSUS REACHED, keeping block")
+            self.log('recvAttestation', f'There are {self.state.getValidatorLen()} validators: {self.state.getValidators()}')
             self.consensus_reached = True
         else:
             # Negative supermajority is reached
             self.newAttestationList = []
             self.newBlock = None
-            print(f"[{self.nodeId}]: CONSENSUS REACHED, discarding block")
+            self.log('recvAttestation', "CONSENSUS REACHED, discarding block")
             self.consensus_reached = True
         return
 
@@ -218,8 +223,8 @@ class Blockchain:
         try:
             bl.sserialize()
         except Exception as e:
-            print(e)
-        print(f"[{self.nodeId}]: PROPOSED BLOCK:", bl)
+            self.log('generateBlock', f'EXCEPTION: {e}')
+        self.log('generateBlock', "PROPOSED BLOCK, sending")
         # Block is ready
         # No need to verify as blocks are verified on arrival
         # Proposed blocks are sent from here to recvBlock()
@@ -259,7 +264,7 @@ class Blockchain:
                 medium[1].encode('utf-8'),
                 medium[2]
             ))
-        print(f'[{self.nodeId}]: AFF list: {mediaList}')
+        # print(f'[{self.nodeId}]: AFF list: {mediaList}')
         return encode(AffiliateMediaList(
             mediaList,
             validator_pub_key
@@ -291,6 +296,7 @@ class Blockchain:
             # If no 'MetaTX': True or 'MetaTX': False
             # - We want to assign SC to someone else
             if (('MetaTX' not in kwargs.keys()) or not kwargs['MetaTX']):
+                self.log('generateTX', 'Generating (MetaTX) forwardable assignment')
                 # Construct, Sign and Send MetaTX
                 txm = self.generateReassign(recp, value)
                 self.forwarder += 1
@@ -305,6 +311,7 @@ class Blockchain:
                 self.middleware.send(resp)
                 return True
         elif type == 2:
+            self.log('generateTX', 'Generating registration form')
             # Register
             # Fill data with registerData serialized
             if (('id_hash' not in kwargs.keys()) or ('vc_zkp' not in kwargs.keys())):
@@ -313,10 +320,11 @@ class Blockchain:
                 return False
             txData = self.generateRegisterData(kwargs['id_hash'], kwargs['vc_zkp'])
         elif type == 3:
+            self.log('generateTX', 'Generating Social Media reg. form')
             # SocMedia Register
             # Fill data with AffiliateMediaList serialized
             if (('validator_pub_key' not in kwargs.keys()) or ('media' not in kwargs.keys())):
-                print(f'[{self.nodeId}]: VAL_PUB_KEY/MEDIA missing.', flush=True)
+                # print(f'[{self.nodeId}]: VAL_PUB_KEY/MEDIA missing.', flush=True)
                 return False
             if not isinstance(kwargs['validator_pub_key'], bytes) or not isinstance(kwargs['media'], list) or not all(isinstance(item, tuple) and
                     len(item) == 3 and
@@ -324,17 +332,13 @@ class Blockchain:
                     isinstance(item[1], str) and
                     isinstance(item[2], bytes)
                     for item in kwargs['media']):
-                print(f'[{self.nodeId}]: VAL_PUB_KEY/MEDIA not the right types.', flush=True)
                 return False
             txData = self.generateAffMediaList(kwargs['validator_pub_key'], kwargs['media'])
         elif type == 4:
+            self.log('generateTX', 'Generating replacement TX')
             # Replacement TX
             return self.generateReplacementTx()
-        else:
-            pass
-        # TxSerializableNoSig(nonce=0, type=0, fee=967, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10', value=1000, timestamp=1747002060, data=b'')
-        # TxSerializableNoSig(nonce=0, type=0, fee=140, sender=b'\xf3\x14\x87\xf4\xa5\xe8\xb4\xac8\xfe\x16\xbb\xb0j\xaf\xf8\xdeqz\xbb', to=b'\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10\x10', value=1000, timestamp=1747002060, data=b'')
-        print(f'[{self.nodeId}]: MY ADDRESS: {self.address.hex()}/{len(self.address)}', flush=True)
+
         tx = TxSerializableNoSig(
             self.nonce,
             type,
@@ -345,18 +349,17 @@ class Blockchain:
             int(time.time()),
             txData
         )
-        print(f'[{self.nodeId}]: GENERATED TX: {tx}', flush=True)
+        self.log('generateTX', f'GENERATED TX ({type})')
         self.nonce += 1
         # Verify TX before sending
         ttx = tx.sign(self.secretKey.to_bytes())
-        print(f'[{self.nodeId}][genTX]: Transaction GOOD?', flush=True)
         try:
             if not self.state.transaction(ttx, True, False):
-                print(f'[{self.nodeId}][genTX]: Transaction discarded')
+                self.log('generateTX', 'Transaction discarded')
                 self.nonce -= 1
                 return False
         except Exception as e:
-            print(f"[{self.nodeId}]: EXCEPTION: {e}", flush=True)
+            self.log('generateTX', f"EXCEPTION: {e}")
         self.middleware.send(RPC.constructRPC('/tx', [Param.constructParam('tx', 5, ttx.sserialize())]))
         return True
 
@@ -385,10 +388,13 @@ class Blockchain:
         # TODO NONCE
         # TODO Every TX with nonce greater/equal to account nonce is correct,
         # TODO if not execute=True
-        print(f'[{self.nodeId}]: ????HMMMM???? {type(self.state)}', flush=True)
+        self.log('recvTx', 'Starting Tx validation')
         if self.state.transaction(txn, verify=True, execute=False):
+            self.log('recvTx', 'Finished Tx validation')
             self.mempool.append(txn)
-            print(f"[{self.nodeId}]: Successfully added to mempool")
+            self.log('recvTx', f"Successfully added TX to mempool ({txn.nonce}/{txn.sender.hex()})")
+        else:
+            self.log('recvTx', 'Transaction invalid, discarding')
         # Else, discard
         # But if this node created that TX, store it's nonce (for future replace)
         if self.address == tx.sender:
@@ -405,10 +411,12 @@ class Blockchain:
         pass
 
     def recvBlock(self, bl: BlockSerializable) -> Attestation | None:
-        print(f"[{self.nodeId}]: BLOCK RECEIVED {bl}")
+        self.log('recvBlock', f"BLOCK RECEIVED from {bl.beneficiary}")
         self.newBlock = bl
         # Validate block on consensus layer
+        self.log('recvBlock', 'Starting block validation')
         ret = self.cProt.attest(self.state, self.chain.rebuildHash(), self.chain.block_number, self.getReward(), bl)
+        self.log('recvBlock', f'Finished block validation as {"IN" if not ret[1] else ""}CORRECT')
         # print("CONSENSUS RETURNED THIS, ", ret)
         # Stop waiting for block
         self.waiting = False
@@ -428,7 +436,7 @@ class Blockchain:
                     b'\x01' if ret[1] else b'\x00'
                 )
                 at = atns.sign(self.secretKey.to_bytes())
-                print(f'[{self.nodeId}]: ISSUING {"POSITIVE" if ret[1] else "NEGATIVE"} ATTESTATION.', flush=True)
+                self.log('recvBlock', f'[{self.nodeId}]: ISSUING {"POSITIVE" if ret[1] else "NEGATIVE"} ATTESTATION.')
                 self.middleware.send(RPC.constructRPC('/attestation', [Param.constructParam('at', 7, at.sserialize())]))
         #for at in self.attestationList:
         #    if at.block_hash != self.newBlock.rebuildHash():
@@ -440,11 +448,12 @@ class Blockchain:
         # TODO
         # print("Pushblock, GOT:", bll)
         if not bll or bll[0].value == b'':
+            self.log('pushBlock', 'Genesis state in the current state')
             acc = self.state.getAccount(self.address)
             self.account = acc if acc else AccSerializable.blank()
             self.gettingReady = False
-            # print("NOWORKRETUREN")
             return
+        self.log('pushBlock', 'The current state is ahead of Genesis')
         # The current state is far, in the distance
         blocks = bll[0]
         cumulus = 0
@@ -470,6 +479,7 @@ class Blockchain:
         acc = self.state.getAccount(self.address)
         self.account = acc if acc else AccSerializable.blank()
         self.gettingReady = False
+        self.log('pushBlock', 'State updated')
         # print("WHOOOOOOOA")
             # Continue to the next block
         # TODO
@@ -494,6 +504,7 @@ class Blockchain:
         return rpc
     
     def start(self):
+        self.log('start', 'Starting Blockchain')
         asyncio.run(self.run())
 
     async def run(self):
@@ -508,7 +519,7 @@ class Blockchain:
         chainTask = asyncio.create_task(self.gameplayLoop())
         await self.shutdownEvent.wait()
         chainTask.cancel()
-        print("[BL] Shutdown complete")
+        self.log('Main Logic Loop', "Shutdown complete")
 
     async def listenToUserInput(self):
         while not self.shutdownEvent.is_set():
@@ -522,7 +533,7 @@ class Blockchain:
                     # This style only sends TXs
                     to = random.sample(self.peerAddresses, 1)[0][0]
                     self.peerAddresses = set(self.peerAddresses)
-                    print(f"[{self.nodeId}]: USER: generating TX to [{to.hex()}]")
+                    self.log('USER', f"Generating TX to [{to.hex()}]")
                     self.generateTX(0, random.randint(0, 1500), to, 10000)
                 if self.playStyle in (1, 2, 7, 8, 9, 10):
                     # This style gossips a registration Tx
@@ -531,58 +542,57 @@ class Blockchain:
                     # Then sneds notmal Txs
                     if (self.state.getAccount(self.address).isVerified()):
                         if self.playStyle in (7, 8):
-                            print(f'[{self.nodeId}]: [genTX]: Account has been verified!!!', flush=True)
+                            self.log('USER', 'Account has been verified!')
                             # Find a validator capable of receiving SC
-                            print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
+                            #print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
                             recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
                             # Generate MetaTX of SC assignment
                             if not self.generateTX(1, 0, recp, 5):
                                 continue
+                            self.log('USER', f'Endorsing {recp.hex()}')
                             if self.playStyle == 7:
                                 self.playStyle = 0
                             else:
-                                print(f'[{self.nodeId}]: Setting style from [{self.playStyle}] to [9].', flush=True)
+                                #print(f'[{self.nodeId}]: Setting style from [{self.playStyle}] to [9].', flush=True)
                                 self.playStyle = 9
                         else:
                             if self.playStyle != 10:
                                 # Generate Soc Media TX
-                                print(f'[{self.nodeId}]: [genTX]: Style {self.playStyle}, generating type 3.', flush=True)
                                 if not self.generateTX(3, random.randint(1000, 2000), b'', 0, b'', validator_pub_key=self.pubk.to_bytes(), media=[(True, 'YouTube', b'\x10' * 288)]):
-                                    print(f'[{self.nodeId}]: [genTX]: Something happened for type 3.', flush=True)
+                                    #print(f'[{self.nodeId}]: [genTX]: Something happened for type 3.', flush=True)
                                     continue
                                 else:
+                                    self.log('USER', 'Registrating Social Media')
                                     self.playStyle = 10
                             else:
                                 if not self.state.getValidator(self.address):
                                     continue
                                 else:
-                                    print(f'[{self.nodeId}]: I AM A VALIDATOR :sunglasses emoji:')
+                                    self.log('USER', 'I AM A VALIDATOR :sunglasses emoji:')
                                     self.playStyle = 0
-                                    print(f'[{self.nodeId}]: [genTX]: Setting style to 0 - {self.playStyle}.', flush=True)
+                                    #print(f'[{self.nodeId}]: [genTX]: Setting style to 0 - {self.playStyle}.', flush=True)
 
                     else:
                         if self.playStyle not in (7, 8):
-                            print(f'[{self.nodeId}]: [genTX]: preRegister', flush=True)
                             if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=b'\x10'*288):
                                 continue
-                            print(f'[{self.nodeId}]: [genTX]: postRegister', flush=True)
+                            self.log('USER', 'ID hash send, waiting to get registered')
                             if self.playStyle == 1:
                                 self.playStyle = 7
                             else:
-                                print(f'[{self.nodeId}]: [genTX]: Setting style to 8.', flush=True)
+                                #print(f'[{self.nodeId}]: [genTX]: Setting style to 8.', flush=True)
                                 self.playStyle = 8
 
 # BlockSerializable(parent_hash=b'H\x138v\xf6\xdcE\x7f1\x08\xf6\xbf\xfc \x9f\xbd\x8b\xf0`n\x97\x05\xd0\x99\xcf\x9c\xcb/6\xf2\xff)', state_root=b'\xf0|\xd8\x96\xf9\x10\x94\xd7w\xc0\x08\xc5$\xb3\xd76\x1bb\x0c\x94\xa9\xe6\xc8z8\xc9\xc39\x83@^P', transactions_root=b"\xd3.\x98\xc2wXW\x1d\x03\x1a\xd6\xb1^'\xbc\xf3\xa7S:\xce\x90\xd3u\xce\x1b\xd3h\xf0\xb5\xd6\xdb\x96", attestations_root=b"\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", receipts_root=b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', epoch_number=0, block_number=1, randao_reveal=b'\xbb/\xa9\xe7\x80\x86YB\x0b\xde\x15\xedN\xc2\xd0\x90|\xe1\xdc\x85\\\x8a\xcc\x05A\x97\xd8\xad\xd0\x02\x01\xb8\x11\x94\x87L\xda<fD\x03\x8e\x0fYw\xd7\xb9tBA:\xb5\xe0-\xe4d|A|C\x06\xca3^\x01', randao_seed=b'\x00', beneficiary=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', timestamp=1747056311, sig_v=1, sig_r=39982920287527697783335693781090821103642387430224504891618268610284025687319, sig_s=48000689032208177769465337186323675556866325199611619492687995999218450658109, data=b'', transactions=(TxSerializable(nonce=0, type=0, fee=1003, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056290, data=b'', v=1, r=97002484183267719760991897808404123263486833262677495044139201273440516512907, s=29692514204150938973460397411460477373447492408132867519384590201803034437385), TxSerializable(nonce=1, type=0, fee=905, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056294, data=b'', v=1, r=70318301139114886979823939533574425134083299656563170061899609605681988843700, s=35141926362186345520198511962782870215218420452510788876210053605227576553261), TxSerializable(nonce=2, type=0, fee=652, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056298, data=b'', v=1, r=106162852652452073661339414748185419327624573366803171157769666824995684689542, s=51064812645936514111524761255195089598087754823317502113228879079757433628770), TxSerializable(nonce=3, type=0, fee=1012, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056302, data=b'', v=0, r=1418407079623880751859391599015542361576698396923465278818457659036260549325, s=42302537586179422804312985062242589634447345721028001029991976689797993592929), TxSerializable(nonce=4, type=0, fee=593, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056306, data=b'', v=1, r=47424605764677307055742008560370012955487540274907545826470722569888542863713, s=9765453466824945638908139698327387661931055674112314335113840189153552326098)), attestations=())
 
             except Exception as e:
-                print(f'[{self.nodeId}]: [UserInput]: [Style: {self.playStyle}] ERROR HAPPENED: {e}', flush=True)
-                traceback.print_exc()
+                self.log('USER', f'ERROR HAPPENED: {e}')
 
     async def listenToNetwork(self):
         while not self.shutdownEvent.is_set():
             msg = self.middleware.recv()
             if msg:
-                print(f"[{self.nodeId}]: [BC] Got from P2P {msg.procedure}")
+                self.log("Network Listener", f'Call: {msg.procedure.decode("ascii")}')
                 if type(msg) == RPC:
                     self.handleMessage(msg)
             await asyncio.sleep(0.1)
@@ -611,7 +621,7 @@ class Blockchain:
             self.reassignRequest(TxMeta.ddeserialize(msg.params[0].value))
         elif procCall == '/setNodeID':
             self.nodeId = msg.params[0].value.decode('utf-8')
-            print("Node ID set:", self.nodeId)
+            self.log('Message from Network', f"Node ID set: {self.nodeId}")
         elif procCall == '/getAddress':
             resp = RPC.constructRPC('/setAddress', [Param.constructParam('addr', 3, self.address)])
             resp.senderId = msg.senderId
@@ -619,7 +629,7 @@ class Blockchain:
         elif procCall == '/setAddress':
             if (self.address == msg.params[0].value):
                 return
-            print(f'[{self.nodeId}]: [BL]: Registering peer [{msg.senderId}] address [{msg.params[0].value.hex()}]')
+            self.log('Message from Network', f'Registering peer [{msg.senderId}] address [{msg.params[0].value.hex()}]')
             self.peerAddresses = set(self.peerAddresses)
             self.peerAddresses.add((msg.params[0].value, msg.senderId))
         return
@@ -633,16 +643,16 @@ class Blockchain:
         while self.gettingReady:
             await asyncio.sleep(5)
         
-        print(f"[{self.nodeId}]: BL: Last block READY", flush=True)
+        self.log('GameplayLoop', f"Last block READY")
         while True:
             # -- Repeat indefinitely --
             self.consensus_reached = False
             # 1. Select a leader (every system should start with at least one registered creator)
             self.cProt.selectLeader(self.state)
-            print(f"[{self.nodeId}]: BL: Leader selected as ", self.cProt.getLeader(), flush=True)
+            self.log('GameplayLoop', f'Leader selected ({self.cProt.getLeader().hex()})')
             # 2. If WE have been selected
             if self.cProt.getLeader() == self.address:
-                print(f"[{self.nodeId}]: BL: I AM LEADER!!!", flush=True)
+                self.log('GameplayLoop', "I AM LEADER!!!")
                 # 2a. Generate a block
                 b = None
                 # 3a. Wait until WE have enough TXs in mempool
@@ -652,19 +662,17 @@ class Blockchain:
                     try:
                         self.generateBlock()
                     except Exception as e:
-                        print(e)
-                        traceback.print_exc()
+                        self.log('GameplayLoop', f'EXCEPTION: {e}')
                     if not self.waiting:
                         await asyncio.sleep(10)
-                print(f"[{self.nodeId}]: I HAVE HAD ENOUGH TXS", flush=True)
+                self.log('GameplayLoop', "Block generated")
                 while self.waiting:
-                    print("here?", flush=True)
                     await asyncio.sleep(0.1)
-                print(f"[{self.nodeId}]: I HAVE WAITED ENOUGH!", flush=True)
+                #print(f"[{self.nodeId}]: I HAVE WAITED ENOUGH!", flush=True)
                 # 5a. Encapsulate the block (to be send-ready)
                 # 6a. Send the encapsulated block through the network
                 #     The steps above are executed in generateBlock()
-            print(f"[{self.nodeId}]: Wait for block.", flush=True)
+            self.log('GameplayLoop', "Waiting for block & attestations")
             # 7. Wait for a new block to arrive
             # 8. When a new block arrives, /recvBlock is called,
             #    the block is validated and an attestation is sent (automatically)
@@ -673,10 +681,10 @@ class Blockchain:
             # 11. Block is either received or rejected
             #    (also we can wait for more attestations or consensus may not be reached)
             # 12. We wait until the new block has been processed
-            print(f"[{self.nodeId}]: Waiting for block processing / Attestation verdict", flush=True)
+            # print(f"[{self.nodeId}]: Waiting for block processing / Attestation verdict", flush=True)
             while not self.consensus_reached:
                 await asyncio.sleep(0.1)
             # 13. Rinse and Repeat!
-            print(f"[{self.nodeId}]: ---NEXT ROUND!---", flush=True)
+            self.log("---NEXT ROUND---")
             self.cProt.randao.reseed(self.chain.randao_seed)
-            print(f"[{self.nodeId}]: BL: RANDAO reseeded", flush=True)
+            self.log('GameplayLoop', f"RANDAO reseeded ({self.cProt.randao.get_seed()})")
