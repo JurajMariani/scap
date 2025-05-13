@@ -1,7 +1,7 @@
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import Binary, binary, big_endian_int, CountableList
-from node.peer import fit_X, to_int, Peer
+from network.peer import fit_X, to_int, Peer
 
 """
 TYPES:

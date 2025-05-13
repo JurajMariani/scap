@@ -2,8 +2,9 @@ import asyncio
 from uuid import uuid4
 import json
 from collections import deque
-from node.peer import Peer, to_int, fit_X
-from node.message import Message, MessageHeader
+from blockchain.utils import chainLog
+from network.peer import Peer, to_int, fit_X
+from network.message import Message, MessageHeader
 from rlp import encode, decode
 from middleware.rpc import RPC, Param
 from middleware.middleware import Postman
@@ -24,7 +25,7 @@ class Node:
     def __init__(self, bridge: Postman, host: str, port: int, bstrapPeers: set[Peer], id: str = ''):
         self.node = Peer.create(str(uuid4()) if not id else id, host, port)
         self.peers: set[Peer] = bstrapPeers
-        print(f'[{self.node.getId()}]: PeerList = {self.peers}', flush=True)
+        # print(f'[{self.node.getId()}]: PeerList = {self.peers}')
         self.peerIds: set[str] = set()
         self.activePeers: set[Peer] = set()
         self.server = None
@@ -36,6 +37,9 @@ class Node:
         # SIGINT/SIGTERM stopper
         self.shutdown_event = asyncio.Event()
         self.peerMgmtTask = None
+
+    def log(self, fn, msg: str = ''):
+        chainLog(self.node.getId(), True, fn, msg)
 
     def getActiveIds(self) -> set[str]:
         res = set()
@@ -58,46 +62,46 @@ class Node:
     async def startServer(self):
         try:
             self.server = await asyncio.start_server(self.handleConnection, self.node.getHost(), self.node.getPort())
-            print(f"[{self.node.getId()}]: Node listening on {self.node.getHost()}:{self.node.getPort()}", flush=True)
+            self.log('Server Info', f"Listening on {self.node.getHost()}:{self.node.getPort()}")
             await self.discoverPeers()
             # Start serving in background
             server_task = asyncio.create_task(self.server.serve_forever())
             # Wait until shutdown_event is set
             await self.shutdown_event.wait()
-            print("Shutting down server...", flush=True)
+            self.log('Server Info', "Shutting down server...")
             server_task.cancel()
             self.server.close()
             await self.server.wait_closed()
         except Exception as e:
-            print("Exception!: ", e, flush=True)
+            self.log("Server Info", f'Exception: {e}')
 
 
     async def listenToBlockchain(self):
-        print(f"[{self.node.getId()}]: Listening to Middleware starts", flush=True)
+        # print(f"[{self.node.getId()}]: Listening to Middleware starts")
         while not self.shutdown_event.is_set():
             msg = self.middleware.recv()
             if msg and type(msg) == RPC:
-                print(f"[{self.node.getId()}][P2P] Got message from blockchain", flush=True)
+                self.log('Blockchain Listener', f"Got a message {msg.procedure.decode('utf-8')}")
                 # Query procedure for inter procedures
                 if msg.procedure.decode('utf-8') == '/getNodeID':
                     try:
                         self.middleware.send(RPC.constructRPC('/setNodeID', [Param.constructParam('', 0, self.node.getId().encode('ascii'))]))
                     except Exception as e:
-                        print(f"[{self.node.getId()}]: HEER IS E", e, flush=True)
+                        self.log('Blockchain Listener', f"Exception: {e}")
                     continue
                 if (msg.procedure.decode('ascii') == '/passBlock' and len(self.activePeers) == 0):
                     # print("Got no one to get blocks from.")
                     self.middleware.send(RPC.constructRPC('/pushBlock', []))
                     continue
                 if (msg.procedure.decode('ascii') == '/setAddress'):
-                    print(f'[{self.node.getId()}]: Sending SetADDRESS to peer [{msg.senderId}]', flush=True)
+                    self.log('Blockchain Listener', f'Sending PeerOlleh + [my address] to peer [{msg.senderId}]')
                     await self.send(msg, 'PeerOlleh', 'x', msg.senderId)
                 if (msg.senderId is not None):
                     await self.send(msg, '', 'x' if msg.xclusive else '', msg.senderId, [self.node] if msg.senderId != '' else None)
                 else:
                     await self.send(msg, '')
             await asyncio.sleep(0.1)
-        print("Shutdown initiated", flush=True)
+        self.log('Blockchain Listener', "Shutdown initiated")
 
     async def peerMgmgt(self):
         try:
@@ -114,7 +118,7 @@ class Node:
                     for p in addList:
                         self.activePeers.add(p)
         except asyncio.CancelledError:
-            print("Shutting Down Peer Management", flush=True)
+            self.log('Peer Management', "Shutting Down Peer Management")
 
     def start(self):
         asyncio.run(self.run())
@@ -129,26 +133,28 @@ class Node:
 
     async def handleConnection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         senderID = str(uuid4())
-        # print(f"[{self.node.getId()}]: Handle connection from [tmp {senderID}]", flush=True)
+        # print(f"[{self.node.getId()}]: Handle connection from [tmp {senderID}]")
         # Handler block
         while True:
             # Read fixed-size message length
-            length = to_int(await reader.readexactly(6))
-            print(f"[{self.node.getId()}]: MSG len: {length}", flush=True)
-            # Load the whole Message
-            msgRaw = await reader.readexactly(length)
+            try:
+                length = to_int(await reader.readexactly(6))
+                #print(f"[{self.node.getId()}]: MSG len: {length}")
+                # Load the whole Message
+                msgRaw = await reader.readexactly(length)
+            except asyncio.IncompleteReadError:
+                self.log('Handling Connection', "Connection closed before message fully received.")
+                break
             # Deserialize header
             try:
                 msg = Message.ddeserialize(msgRaw)
-                # print(f'[{self.node.getId()}]: INCOMMING MESSAGE: {msg.getId()}, ({msg.header.type})', flush=True)
-                # print(f'[{self.node.getId()}]: INCOM: (tmp [{senderID}] == [{msg.header.sender.getId()}])', flush=True)
+                # print(f'[{self.node.getId()}]: INCOMMING MESSAGE: {msg.getId()}, ({msg.header.type})')
+                # print(f'[{self.node.getId()}]: INCOM: (tmp [{senderID}] == [{msg.header.sender.getId()}])')
                 # print("PROCESS INCOMMING MSG")
                 # Process message
                 await self.handleMessage(msg, reader, writer)
-            except asyncio.IncompleteReadError:
-                print("Connection closed before message fully received.", flush=True)
             except Exception as e:
-                print(f"Error while handling connection: {e}", flush=True)
+                self.log('Handling Connection', f"Error while handling connection: {e}")
 
     def addToPeerList(self, peer: Peer):
         if peer.getId() not in (self.peerIds | {self.node.getId()}):
@@ -160,7 +166,7 @@ class Node:
         if peer.getId() not in (self.getActiveIds() | {self.node.getId()}):
             if len(self.activePeers) < self.config['network']['max_peers']:
                 self.activePeers.add(peer)
-                # print(f"[{self.node.getId()}]: ADDED peer {peer.getId()}. Peer list has {len(self.activePeers)}/{len(self.peers)} peers", flush=True)
+                # print(f"[{self.node.getId()}]: ADDED peer {peer.getId()}. Peer list has {len(self.activePeers)}/{len(self.peers)} peers")
                 return True
         return False
 
@@ -188,10 +194,10 @@ class Node:
         mmsg = msg.toDict()
         msgId = mmsg['header'].get('id')
         if self.hasSeen(msgId):
-            print(f"[{self.node.getId()}]: I have seen message {msg.getId()}", flush=True)
+            # print(f"[{self.node.getId()}]: I have seen message {msg.getId()}")
             return
         self.rememberMsg(msgId)
-        # print(f"[{self.node.getId()}] Received: msgid: {mmsg['header'].get('id')}/'{mmsg['header']['type']}' from {mmsg['header']['sender'].getId()}", flush=True)
+        # print(f"[{self.node.getId()}] Received: msgid: {mmsg['header'].get('id')}/'{mmsg['header']['type']}' from {mmsg['header']['sender'].getId()}")
         # Auto-add sender to peer list
         sender: Peer = mmsg['header'].get('sender')
         # Strore reader and writer of Peer
@@ -202,7 +208,7 @@ class Node:
         if (sender.getId() not in self.peerIds):
             fstPeerHello = True
         self.addPeer(sender)
-        # print(f'[{self.node.getId()}]: I have {len(self.activePeers)}/{len(self.peers)} peers: ({self.getActiveIds()})', flush=True)
+        # print(f'[{self.node.getId()}]: I have {len(self.activePeers)}/{len(self.peers)} peers: ({self.getActiveIds()})')
         
         if sender.getId() == self.node.getId():
             # Store connection to self separately
@@ -214,16 +220,17 @@ class Node:
         msgType = mmsg['header'].get('type')
         # Subtype serves no purpose fo far
         # msgSubType = msg.get('subtype')
-        # print(f"[{self.node.getId()}]: MSGTYPE:", msgType, flush=True)
+        # print(f"[{self.node.getId()}]: MSGTYPE:", msgType)
         if msgType == "PeerHello":
             if sender.getId() == self.node.getId():
                 return
+            self.log('Message Handler', f"Recvd PeerHello from peer {sender.getId()}")
             if fstPeerHello:
+                self.log('Message Handler', f'Sending PeerHello to [{sender.getId()}]')
                 await self.sendMessage(self.getPeerHello(), sender, [self.peers.difference({sender})])
             query = RPC.constructRPC('/getAddress', [])
             query.senderId = sender.getId()
             self.middleware.send(query)
-            print(f"[{self.node.getId()}]: Recvd PeerHello from peer {mmsg['header']['sender'].getId()}", flush=True)
             # Respond with courtesy
             # await self.sendMessage(self.getPeerOlleh(), sender, [self.node])
         elif msgType == "GetPeers":
@@ -235,17 +242,20 @@ class Node:
             #    self.addPeer(p)
             pass
         elif msgType == "PeerOlleh":
-            # print(f"[{self.node.getId()}]: Received PeerOlleh from peer {mmsg['header']['sender'].getId()}", flush=True)
+            self.log('Message HAndler', f'Recvd PeerOlleh from [{sender.getId()}], how polite.')
+            # print(f"[{self.node.getId()}]: Received PeerOlleh from peer {mmsg['header']['sender'].getId()}")
             pass
         else:
             # Synchornization logic
             # 1. Flood message if not subtype exclusive (x)
             if mmsg['header']['subtype'] != 'x' and sender.getId() != self.node.getId():
+                self.log('Message Handler', 'Flooding network with message')
                 await self.sendMessage(msg, exclude=[self.node])
             # 2. Include message details for sendback
             payload = msg.payload
             payload.senderId = sender.getId()
             # 3. Execute message on Blockchain layer
+            self.log('Message Handler', f'Delegating message {payload.procedure.decode("ascii")} to blockchain')
             self.middleware.send(payload)
 
     def hasSeen(self, msg_id):
@@ -259,13 +269,13 @@ class Node:
         self.message_set.add(msg_id)
 
     async def discoverPeer(self, p: Peer, i: int) -> None:
-        print(f"[{self.node.getId()}]: Opening connection {i}", flush=True)
+        self.log('Discover Peers', f"Opening connection {i} to {p.getHost()}:{p.getPort()}")
         if  p == self.node:
             # print("Opening to self")
             pass
         if not p.reader and not p.writer:
             p.reader, p.writer = await asyncio.open_connection(p.getHost(), p.getPort())
-            print(f"[{self.node.getId()}]: Sending PeerHello to {p.getId()}", flush=True)
+            self.log('Discover Peers', f"Sending PeerHello to {p.getId()}")
             asyncio.create_task(self.handleConnection(p.reader, p.writer))
             await self.sendMessage(self.getPeerHello(), p)
         
@@ -275,12 +285,12 @@ class Node:
                 p.writer.close()
                 await p.writer.wait_closed()
             except Exception as e:
-                print(f"[{self.node.getId()}] Something happened when closing writer to {p.getHost()}:{p.getPort()} — {e}", flush=True)
+                self.log('Closing Connections', f"Something happened when closing writer to {p.getHost()}:{p.getPort()} — {e}")
 
     async def discoverPeers(self) -> None:
         for p in self.peers:
             self.peerIds.add(p.getId())
-        # print(f'[{self.node.getId()}]: I HAVE THESE PEERS {self.peerIds}', flush=True)
+        # print(f'[{self.node.getId()}]: I HAVE THESE PEERS {self.peerIds}')
         self.peers = set(self.peers)
         if len(self.peers) <= self.config['network']['max_peers']:
             self.activePeers = self.peers.copy()
@@ -288,9 +298,8 @@ class Node:
             self.activePeers = set(random.sample(self.peers, self.config['network']['max_peers']))
         i = 0
         self.activePeers = set(self.activePeers)
-        # print(f'[{self.node.getId()}]: I HAVE THESE ACTIVE PEERS {self.getActiveIds()}', flush=True)
+        # print(f'[{self.node.getId()}]: I HAVE THESE ACTIVE PEERS {self.getActiveIds()}')
         for p in self.activePeers | {self.node}:
-            print(f"[{self.node.getId()}]: Discovering peer {p.getId()}", flush=True)
             await self.discoverPeer(p, i)
             i+=1
     
@@ -313,7 +322,7 @@ class Node:
         # Close all reader/writer Streams
         for p in self.peers:
             await self.closeConnection(p)
-        print("Stopped", flush=True)
+        self.log('STOP', "Server stopped")
 
     async def send(self, payload: RPC, type: str, subtype: str = '', to: str = '', exclude: list[Peer] | None = None):
         recv = None
@@ -340,36 +349,31 @@ class Node:
         await self.sendMessage(msg)
 
     async def networkSend(self, to: Peer, what: Message):
-        # print("NETWORK SEND")
+        msgtype = what.header.type.decode("utf-8").rstrip("\x00")
+        self.log('Network Send', f'Sending message ("{msgtype}") to {to.getId()}')
         try:
             sendBytes = what.sserialize()
             if len(sendBytes) >= 2**(6*8):
                 raise Exception(f"Message too large ({len(sendBytes)}>= {2**(6*8)}).")
-            # print(f'[{self.node.getId()}]: Sending message[{what.getId()}] to [{to.getId()}]', flush=True)
+            # print(f'[{self.node.getId()}]: Sending message[{what.getId()}] to [{to.getId()}]')
             to.writer.write(fit_X(len(sendBytes), 6) + sendBytes)
             await to.writer.drain()
         except Exception as e:
-            print(f"[{self.node.getId()}] Failed to send message to {to.getHost()}:{to.getPort()} — {e}", flush=True)
+            self.log('NEtwork Send', f"Failed to send message to {to.getHost()}:{to.getPort()} — {e}")
 
     async def sendMessage(self, msg: Message, target: Peer | None = None, exclude: list[Peer] | None = None):
         if msg.header.type != b'\x00' * 16:
             self.rememberMsg(msg.getId())
-        #if (msg.header.type == fit_X("PeerOlleh", 16)):
-        #    print(f"[{self.node.getId()}]: Trying to send PeerOlleh to {target.getId()}", flush=True)
         if target != None:
             # Send only one message (to target)
             if exclude != None and target in exclude:
                 return
             else:
-                # if (msg.header.type == fit_X("PeerOlleh", 16)):
-                #     print(f"[{self.node.getId()}]: Trying to send PeerOlleh to ONE PEER", flush=True)
                 await self.networkSend(target, msg)
-                #if (msg.header.type == fit_X("PeerOlleh", 16)):
-                #    print(f"[{self.node.getId()}]: PeerOlleh successfully sent to {target.getId()}, id: {msg.getId()}", flush=True)
         else:
             for p in self.activePeers:
                 if p.writer is None or p.writer.transport is None or p.writer.transport.is_closing():
-                    print(f"[{self.node.getId()}] Writer for {p.getId()} is invalid or closed.", flush=True)
+                    self.log('Sending Message', f"Writer for {p.getId()} is invalid or closed.")
             # Send to all peers
             for p in (self.activePeers | {self.node}):
                 # That are not in exclude list

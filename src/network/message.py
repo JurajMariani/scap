@@ -2,7 +2,7 @@ from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import Binary
 from middleware.rpc import RPC
-from node.peer import Peer, fit_X
+from network.peer import Peer, fit_X
 
 class MessageHeader(Serializable):
     fields = [

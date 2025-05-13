@@ -1,24 +1,22 @@
 from multiprocessing import Process, Queue
 from blockchain.blockchain import Blockchain
-from node.node import Node, Peer
+from blockchain.utils import chainLog
+from network.node import Node, Peer
 from middleware.middleware import Postman
-import asyncio
+from blockchain.utils import Genesis
 import signal
 import atexit
 import os
-from tests.factory import Adam, Eve, rand
 
 class Bootstrapper:
-    def __init__(self, ip: str, port: int, adam = True, peerlist: list[Peer] = [], nodeId: str = '', style: int = 0):
-        self.c = Adam() if adam else rand()
-        # print(self.c[0][0].to_bytes().hex(), self.c[0][1].to_bytes().hex(), self.c[0][1].to_canonical_address().hex())
-        # print(self.c[1].id_hash.hex())
+    def __init__(self, ip: str = '127.0.0.1', port: int = 5000, adam = True, peerlist: list[Peer] = [], nodeId: str = '', lock = None, style: int = 0):
+        g = Genesis()
+        self.c = g.Adam() if adam else g.rand()
         self.queue_bc_to_p2p = Queue()
         self.queue_p2p_to_bc = Queue()
         # Bridge the gap
         self.bridge_p2p = Postman(self.queue_bc_to_p2p, self.queue_p2p_to_bc)
         self.bridge_bc = Postman(self.queue_p2p_to_bc, self.queue_bc_to_p2p)
-        # Endpoints
         self.node: Node | Node = None
         self.blochchain: Blockchain | None = None
         self.ip = ip
@@ -26,6 +24,7 @@ class Bootstrapper:
         self.peerList = peerlist
         self.nodeId = nodeId
         self.playStyle = style
+        self.lock = lock
         atexit.register(self.cleanup)
         self.wipeStorage()
 
@@ -35,11 +34,20 @@ class Bootstrapper:
         for filename in os.listdir(directory):
             file_path = os.path.join(directory, filename)
             if os.path.isfile(file_path):
-                # print("Removing " + file_path)
+                os.remove(file_path)
+        directory = './storage/zkp/'
+        for filename in os.listdir(directory):
+            file_path = os.path.join(directory, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        directory = './storage/zkp/'
+        for filename in os.listdir(directory):
+            file_path = os.path.join(directory, filename)
+            if os.path.isfile(file_path):
                 os.remove(file_path)
 
     def cleanup(self):
-        print('Called cleanup')
+        chainLog(self.node.node.getId(), None,'Cleanup')
         self.node.shutdown()
         self.blockchain.shutdown()
 
