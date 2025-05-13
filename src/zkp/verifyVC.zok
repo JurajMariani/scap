@@ -1,4 +1,4 @@
-import "signatures/verifyEddsa" as verifyEddsa;
+import "./utils/verifyEddsa" as verifyEddsa;
 import "hashes/keccak/256bit" as keccak;
 import "utils/pack/u32/pack256" as ipack256;
 import "./utils/u8_32_to_u32_8" as u8_32_to_u32_8;
@@ -21,7 +21,8 @@ def c_hash(u8[512] input) -> u32[8] {
 ///    with the one provided and the hash doesn't as well
 ///  - For Testing purposes, random values will be spplied
 ///
-def main(field[2] issuer_pub_key, field hash, private u8[512] vc, private field[2] sig_R, private field sig_S) {
+///def main(field[2] issuer_pub_key, field hash, private u8[512] vc, private field[2] sig_R, private field sig_S) {
+def main(field hash, private u8[512] vc) {
     // Compute KECCAK hash of the VC and compare with input hash
     u32[8] raw_hash = c_hash(vc);
     field computed_hash = ipack256(raw_hash);
@@ -29,7 +30,7 @@ def main(field[2] issuer_pub_key, field hash, private u8[512] vc, private field[
     // Verify the signature using the provided issuer's public key
     // The `!` inverting the result of the verifyEddsa function 
     // is there due to simulated verification
-    assert(!verifyEddsa(sig_R, sig_S, issuer_pub_key, raw_hash, [0;8], context()));
+    //assert(!verifyEddsa(sig_R, sig_S, issuer_pub_key, raw_hash, context()));
 
     // Assert Hash
     // This functionality is simulated (same as verifyEddsa)
