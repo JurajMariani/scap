@@ -4,12 +4,13 @@ from blockchain.utils import chainLog
 from network.node import Node, Peer
 from middleware.middleware import Postman
 from blockchain.utils import Genesis
+from chainlogger.logger import setupLogger
 import signal
 import atexit
 import os
 
 class Bootstrapper:
-    def __init__(self, ip: str = '127.0.0.1', port: int = 5000, adam = True, peerlist: list[Peer] = [], nodeId: str = '', lock = None, style: int = 0):
+    def __init__(self, ip: str = '127.0.0.1', port: int = 5000, adam = True, peerlist: list[Peer] = [], nodeId: str = '', loggerQueue = None, style: int = 0):
         g = Genesis()
         self.c = g.Adam() if adam else g.rand()
         self.queue_bc_to_p2p = Queue()
@@ -23,8 +24,9 @@ class Bootstrapper:
         self.port = port
         self.peerList = peerlist
         self.nodeId = nodeId
+        self.queue = loggerQueue
+        self.logger = setupLogger(loggerQueue)
         self.playStyle = style
-        self.lock = lock
         atexit.register(self.cleanup)
         self.wipeStorage()
 
@@ -47,13 +49,13 @@ class Bootstrapper:
                 os.remove(file_path)
 
     def cleanup(self):
-        chainLog(self.node.node.getId(), None,'Cleanup')
+        chainLog(self.logger, self.node.node.getId(), None, 'Cleanup')
         self.node.shutdown()
         self.blockchain.shutdown()
 
     def start(self):
-        self.node = Node(self.bridge_p2p, self.ip, self.port, self.peerList, self.nodeId)
-        self.blockchain = Blockchain(self.bridge_bc, self.c[1], sk=self.c[0][0].to_bytes(), playStyle=self.playStyle)#, self.c[0][1].to_canonical_address(), self.c[0][0].to_bytes(), self.c[4], self.c[3])
+        self.node = Node(self.bridge_p2p, self.ip, self.port, self.peerList, self.queue, self.nodeId)
+        self.blockchain = Blockchain(self.bridge_bc, self.c[1], sk=self.c[0][0].to_bytes(), loggerQueue=self.queue, playStyle=self.playStyle)#, self.c[0][1].to_canonical_address(), self.c[0][0].to_bytes(), self.c[4], self.c[3])
         # Launch processes
         p_node = Process(target=self.node.start)
         p_blockchain = Process(target=self.blockchain.start)

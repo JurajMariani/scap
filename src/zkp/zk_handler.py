@@ -14,7 +14,7 @@ def __compile_circuit(create: bool = True):
             return
     """Compile the circuit if 'out' file does not exist."""
     subprocess.run(["zokrates", "compile", "-i", CIRCUIT_FILE], capture_output=True, text=True, cwd='./zkp')
-    subprocess.run(["zokrates", "setup"], cwd='./zkp')
+    subprocess.run(["zokrates", "setup"], cwd='./zkp', capture_output=True, text=True)
     return
 
 def __compute_witness(filename = 'proof'):
@@ -29,7 +29,7 @@ def __compute_witness(filename = 'proof'):
     result = subprocess.run(["zokrates", "compute-witness", "-a"] + [str(H)] + argsVC, capture_output=True, text=True, cwd='./zkp')
     if "Witness file written to 'witness'" not in result.stdout:
         print(f'Something Happened - {result.stdout}')
-    result = subprocess.run(["zokrates", 'generate-proof', '-j', f'{filename}.json'], cwd='./zkp')
+    result = subprocess.run(["zokrates", 'generate-proof', '-j', f'{filename}.json'], cwd='./zkp', capture_output=True, text=True)
 
 def __verifyProof(filename: str = 'proof') -> bool:
     result = subprocess.run(["zokrates", "verify", "--proof-path", f'{filename}.json'], cwd='./zkp', capture_output=True, text=True)

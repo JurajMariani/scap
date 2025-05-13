@@ -8,8 +8,8 @@ from network.message import Message, MessageHeader
 from rlp import encode, decode
 from middleware.rpc import RPC, Param
 from middleware.middleware import Postman
+from chainlogger.logger import setupLogger
 import random
-import traceback
 
 # MSG:
 # {
@@ -22,7 +22,7 @@ import traceback
 # }
 
 class Node:
-    def __init__(self, bridge: Postman, host: str, port: int, bstrapPeers: set[Peer], id: str = ''):
+    def __init__(self, bridge: Postman, host: str, port: int, bstrapPeers: set[Peer], loggerQueue = None, id: str = ''):
         self.node = Peer.create(str(uuid4()) if not id else id, host, port)
         self.peers: set[Peer] = bstrapPeers
         # print(f'[{self.node.getId()}]: PeerList = {self.peers}')
@@ -34,12 +34,13 @@ class Node:
         self.recent_messages = deque(maxlen=self.config['network']['max_messages_kept'])
         self.message_set = set()
         self.middleware: Postman = bridge
+        self.nodelogger = setupLogger(loggerQueue)
         # SIGINT/SIGTERM stopper
         self.shutdown_event = asyncio.Event()
         self.peerMgmtTask = None
 
     def log(self, fn, msg: str = ''):
-        chainLog(self.node.getId(), True, fn, msg)
+        chainLog(self.nodelogger, self.node.getId(), True, fn, msg)
 
     def getActiveIds(self) -> set[str]:
         res = set()

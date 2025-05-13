@@ -1,13 +1,12 @@
 from __future__ import annotations
 from trie import HexaryTrie
-from eth_keys import keys
 from eth_utils import keccak
-from rlp.sedes import binary
 import json
 import time
 
 from rlp import decode
-from blockchain.transaction import TxSerializable, TxSerializableNoSig, TxMeta, TxMetaNoSig
+from blockchain.zkp_manager import verify
+from blockchain.transaction import TxSerializable, TxMeta
 from blockchain.account import AccSerializable, Endorsement, RegisterData, AffiliateMedia, AffiliateMediaList
 
 # TODO
@@ -330,10 +329,9 @@ class StateTrie:
         if d.vc_zkp == b'':
             return False
         # Verify ZKP
-        # TODO
-        valid = True
-        # TODO
+        valid = verify(d.vc_zkp, str(int(time.time())))
         if (not valid):
+            print('INVALID ZKPPPPPPPPPPPPP!', flush=True)
             return False
         return True
 

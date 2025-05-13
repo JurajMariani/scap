@@ -3,10 +3,12 @@ from blockchain.transaction import TxSerializable, TxSerializableNoSig, TxMeta, 
 from blockchain.state import StateTrie
 from blockchain.account import AccSerializable, RegisterData, AffiliateMediaList, AffiliateMedia
 from blockchain.consensus import PoSC
+from blockchain.zkp_manager import generate
 from blockchain.utils import Genesis, chainLog
 from middleware.middleware import Postman
 from middleware.rpc import Param, RPC
 from network.peer import to_int
+from chainlogger.logger import setupLogger
 from eth_keys import keys
 from eth_utils import keccak
 from rlp import encode, decode
@@ -19,7 +21,7 @@ import traceback
 import random
 
 class Blockchain:
-    def __init__(self, bridge: Postman, address: bytes, sk: bytes = b'', acc: AccSerializable | None = None, genesis: BlockSerializable | None = None, sts: StateTrie | None = None, playStyle: int = 0):
+    def __init__(self, bridge: Postman, address: bytes, sk: bytes = b'', acc: AccSerializable | None = None, genesis: BlockSerializable | None = None, sts: StateTrie | None = None, loggerQueue = None, playStyle: int = 0):
         g = Genesis()
         self.gettingReady = True
         self.chain: BlockSerializable | None = g.constructGenesisBlock()
@@ -52,11 +54,12 @@ class Blockchain:
         self.nodeId = ''
         # TODO
         # For testing purposes
+        self.chainlogger = setupLogger(loggerQueue)
         self.playStyle = playStyle
         self.log('INIT', 'Blockchain initialized')
 
     def log(self, fn, msg: str = ''):
-        chainLog(self.nodeId, False, fn, msg)
+        chainLog(self.chainlogger, self.nodeId, False, fn, msg)
 
     def setAccount(self, acc: AccSerializable) -> None:
         # Eiter use this fn or pass account in constructor
@@ -411,7 +414,7 @@ class Blockchain:
         pass
 
     def recvBlock(self, bl: BlockSerializable) -> Attestation | None:
-        self.log('recvBlock', f"BLOCK RECEIVED from {bl.beneficiary}")
+        self.log('recvBlock', f"BLOCK RECEIVED from {bl.beneficiary.hex()}")
         self.newBlock = bl
         # Validate block on consensus layer
         self.log('recvBlock', 'Starting block validation')
@@ -574,7 +577,11 @@ class Blockchain:
 
                     else:
                         if self.playStyle not in (7, 8):
-                            if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=b'\x10'*288):
+                            vczkp = await asyncio.to_thread(generate(self.nodeId + str(int(time.time()))))
+                            if not vczkp:
+                                continue
+                            print('GENERATED ZKPPPPPP: ' + vczkp.hex(), flush=True)
+                            if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=vczkp):
                                 continue
                             self.log('USER', 'ID hash send, waiting to get registered')
                             if self.playStyle == 1:
@@ -687,4 +694,4 @@ class Blockchain:
             # 13. Rinse and Repeat!
             self.log("---NEXT ROUND---")
             self.cProt.randao.reseed(self.chain.randao_seed)
-            self.log('GameplayLoop', f"RANDAO reseeded ({self.cProt.randao.get_seed()})")
+            self.log('GameplayLoop', f"RANDAO reseeded ({self.cProt.randao.get_seed().hex()})")

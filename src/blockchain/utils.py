@@ -13,12 +13,13 @@ import json
 
 
 
-def chainLog(nodeId: str, nodeProc: bool | None, fnMethod: str, message: str = ''):
+def chainLog(logger, nodeId: str, nodeProc: bool | None, fnMethod: str, message: str = ''):
     if nodeProc is not None:
         np = "NODE" if nodeProc else "BLOCKCHAIN"
     else:
         np = "NONE"
-    print(f'[{time.time():.7f}] [{nodeId}] [{np}] [{fnMethod}]]{": " + message if message else message}', flush=True)
+    logger.info(f'[{nodeId}] [{np}] [{fnMethod}]]{": " + message if message else message}')
+    #print(f'[{time.time():.7f}] [{nodeId}] [{np}] [{fnMethod}]]{": " + message if message else message}', flush=True)
 
 
 class Genesis:
