@@ -27,3 +27,7 @@ def verify(proof: bytes, filename: str) -> bool:
     if os.path.isfile(pathToZKstorage + filename + '.bin'):
         os.remove(pathToZKstorage + filename + '.bin')
     return ret
+
+if __name__ == "__main__":
+    x = generate('test')
+    print(verify(x, 'test'))
