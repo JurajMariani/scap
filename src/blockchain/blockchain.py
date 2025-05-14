@@ -593,7 +593,7 @@ class Blockchain:
                                 #print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
                                 recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
                                 # Generate MetaTX of SC assignment
-                                if not self.generateTX(1, 0, recp, random.randint(50, self.account.passive_sc)):
+                                if not self.generateTX(1, 0, recp, random.randint(0, self.account.passive_sc)):
                                     continue
                                 blockwait = self.chain.block_number + 2
                                 self.log('USER', f'Endorsing {recp.hex()}')
