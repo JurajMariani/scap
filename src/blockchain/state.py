@@ -1,6 +1,7 @@
 from __future__ import annotations
 from trie import HexaryTrie
 from eth_utils import keccak
+import asyncio
 import json
 import time
 
@@ -22,6 +23,7 @@ class StateTrie:
         # For the time being, this remains unused
         # Can be used in the future for optimisation
         # TODO
+        self.nodeID = ''
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
 
@@ -33,6 +35,7 @@ class StateTrie:
         st.iddb = self.iddb.copy()
         st.state_trie = HexaryTrie(st.db, self.getRootHash())
         st.id_trie = HexaryTrie(st.iddb, self.id_trie.root_hash)
+        st.nodeID = self.nodeID
         return st
 
     def transaction(self, tx: TxSerializable, verify: bool = True, execute: bool = True) -> bool:
@@ -98,6 +101,9 @@ class StateTrie:
     
     def getValidatorLen(self) -> int:
         return len(self.valAddrList)
+    
+    def getValidatorSupermajorityLenFromNum(self, num: int) -> int:
+        return ((num // 3) * 2)
     
     def getValidatorSupermajorityLen(self) -> int:
         return (self.getValidatorLen() // 3) * 2
@@ -243,7 +249,7 @@ class StateTrie:
             if (e.address == addr):
                 return i
             i+=1
-        return -1 
+        return -1
 
     def reassign(self, tx: TxSerializable, verify, execute) -> bool:
         # Verification (of all txs in a block) should be done before application
@@ -329,9 +335,9 @@ class StateTrie:
         if d.vc_zkp == b'':
             return False
         # Verify ZKP
-        valid = verify(d.vc_zkp, str(int(time.time())))
+        valid = verify(d.vc_zkp, self.nodeID + str(int(time.time())))
         if (not valid):
-            print('INVALID ZKPPPPPPPPPPPPP!', flush=True)
+            # print('INVALID ZKPPPPPPPPPPPPP!', flush=True)
             return False
         return True
 

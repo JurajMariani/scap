@@ -76,7 +76,7 @@ class PoSC:
     def getLeader(self) -> bytes | None:
         return self.leader
 
-    def attest(self, state: StateTrie, parentHash: bytes, parentBNumber: int, cRew: int, bl: BlockSerializable) -> tuple[StateTrie, bool]:
+    def attest(self, state: StateTrie, parentHash: bytes, parentBNumber: int, cRew: int, lastValidatLen: int, bl: BlockSerializable) -> tuple[StateTrie, bool]:
         # Maybe redundant
         self.proposedBlock = bl
         # Beneficiary must match current leader
@@ -84,7 +84,7 @@ class PoSC:
             return (state, False)
         # Validate block
         # print(self.randao.seed)
-        return bl.verifyBlock(state, parentHash, parentBNumber, cRew, self.randao.get_seed())
+        return bl.verifyBlock(state, parentHash, parentBNumber, cRew, lastValidatLen, self.randao.get_seed())
     
     # randao seed 
     # b'\xb3do\x89\x02\xa9=\xae\x9f\x95"\xffo\xfa\x8a\x82\x94+\x89}W\xa6\xec_\xfd\x00A\xe6#\xf3i4'

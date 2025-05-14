@@ -269,7 +269,7 @@ class BlockSerializable(Serializable):
         # Verify signature
         return signature.verify_msg_hash(message, pk)
     
-    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int, rSeed: bytes) -> tuple[StateTrie, bool]:
+    def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int, lastValidatLen: int, rSeed: bytes) -> tuple[StateTrie, bool]:
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
             return (state, False)
@@ -305,7 +305,7 @@ class BlockSerializable(Serializable):
         if self.block_number != parentBlockNo + 1:
             return (state, False)
         # Verify prev. block attestations
-        if not self.verifyAttestations(state):
+        if not self.verifyAttestations(state, lastValidatLen):
             return (state, False)
         # Verify attestation root hash
         if (self.attestations_root != self.calculateListHash(self.attestations)):
@@ -332,6 +332,7 @@ class BlockSerializable(Serializable):
         tmp.valAddrList = deepcopy(state.valAddrList)
         tmp.state_trie = HexaryTrie(tmp.db, root_hash=state.getRootHash())
         tmp.id_trie = HexaryTrie(tmp.iddb, root_hash=state.id_trie.root_hash)
+        tmp.nodeID = state.nodeID
         # 2. On the tmp state, no-verify, execute all txs
         for tx in txs:
             if not tmp.transaction(tx, False,  True):
@@ -379,9 +380,9 @@ class BlockSerializable(Serializable):
         #   7. Apply Changes (new final state is tmp)
         return (res[0], True)
     
-    def verifyAttestations(self, state: StateTrie) -> bool:
+    def verifyAttestations(self, state: StateTrie, lastValidatLen: int) -> bool:
         # Verify a supermajority attested
-        if (len(self.attestations) < state.getValidatorSupermajorityLen()):
+        if (len(self.attestations) < state.getValidatorSupermajorityLenFromNum(lastValidatLen)):
             return False
         positiveVerdicts = 0
         for att in self.attestations:
@@ -402,7 +403,7 @@ class BlockSerializable(Serializable):
             if pk.to_canonical_address() != att.sender:
                 return False
         # Verify positive attestation count
-        if positiveVerdicts < state.getValidatorSupermajorityLen():
+        if positiveVerdicts < state.getValidatorSupermajorityLenFromNum(lastValidatLen):
             return False
         return True
     

@@ -6,7 +6,7 @@
         "initial_reward": 50e14
     },
     "sc_constants": {
-        "def_passive_sc": 10,
+        "def_passive_sc": 100,
         "domain_randao": "02000000",
         "scaling": "root"
     },

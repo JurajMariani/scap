@@ -9,7 +9,7 @@ import time
 # Style 0 - only send TXs
 # Style 1 - Register and Endorse, then switch to 0
 # Style 2 - Resgister, Endorse, Become validator, then 0
-styles = [0, 2]
+styles = [0, 2, 2, 2]
 # Create the log queue
 log_queue = multiprocessing.Queue()
 listener = multiprocessing.Process(target=loggerListener, args=(log_queue,))
@@ -33,7 +33,7 @@ def populate(n: int, base_port=5000):
         bootstrappers.append(b)
         procs = b.start()
         processes.extend(procs)
-        time.sleep(0.5)  # Optional: give some time between startups
+        time.sleep(0.5)
 
     for p in processes:
         p.join()
@@ -43,4 +43,4 @@ def populate(n: int, base_port=5000):
     listener.join()
 
 if __name__ == "__main__":
-    populate(2)
+    populate(4)

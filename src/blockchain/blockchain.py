@@ -37,6 +37,7 @@ class Blockchain:
         self.badNonces: list[int] = []
         self.nonce = 0
         self.forwarder = 0
+        self.passive_sc = 0
         self.waiting = False
         self.consensus_reached = False
         self.peerAddresses: set[tuple[bytes, str]] = []
@@ -52,6 +53,7 @@ class Blockchain:
         self.shutdownEvent = asyncio.Event()
         self.middleware.send(RPC.constructRPC('/getNodeID', []))
         self.nodeId = ''
+        self.lastRoundValidatorCount = 0
         # TODO
         # For testing purposes
         self.chainlogger = setupLogger(loggerQueue)
@@ -114,16 +116,19 @@ class Blockchain:
         # Sender is a validator
         add = at.recoverAddress()
         if not self.state.getValidator(add):
+            self.log('recvAttestation', 'Discarding Attestation - sender is not a validator')
             return
         # Sender matches signature
         if not at.verifySig():
             self.slash(add)
+            self.log('recvAttestation', 'Discarding Attestation - sender does not match the signature')
             return
         #print(f'[{self.nodeId}]: ATTESTATIONS: {self.attestationList}, New Block Present? {True if self.newBlock else False}')
         # Attestation should match current block or past blocks
         if at.block_hash != self.newBlock.rebuildHash():
             if at.block_hash in self.getPastBlockHashList():
                 self.slash(at.sender)
+                self.log('recvAttestation', 'Discarding Attestation - Attestation is not for the current block')
                 return
         # If Attestation is correct, add it to list
         self.newAttestationList.append(at)
@@ -139,14 +144,15 @@ class Blockchain:
         # If consensus cannot be reached
         # menanig there is no logner an honest supermajority
         # the best coarse of action is to leave the network
-        if (self.state.getValidatorLen() - len(self.newAttestationList) + more) < self.state.getValidatorSupermajorityLen():
+        vlaidatorLen = self.state.getValidatorSupermajorityLenFromNum(self.lastRoundValidatorCount)
+        if (self.state.getValidatorLen() - len(self.newAttestationList) + more) < vlaidatorLen:
             self.log('recvAttestaton', "Consensus cannot be reached. Terminating...")
             exit(1)
         # If we don't have a supermajority yet
-        elif len(self.newAttestationList) < self.state.getValidatorSupermajorityLen():
+        elif len(self.newAttestationList) < vlaidatorLen:
             return
         # If positive supermajority is reached
-        elif positive > self.state.getValidatorSupermajorityLen():
+        elif positive >= vlaidatorLen:
             # Attestations are stored for the next block
             self.attestationList = self.newAttestationList
             # TMP list is wiped
@@ -154,6 +160,7 @@ class Blockchain:
             # Proposed block can be safely added to the chain
             self.log('recvAttestation', 'State update started')
             self.store()
+            self.lastRoundValidatorCount = self.state.getValidatorLen()
             self.state = self.newBlock.getStateAfterExecution(self.state, self.getReward())[0]
             self.log('recvAttestation', 'State update finished')
             #print("THIS ACC NONCE IS", self.state.getAccount(self.address).nonce)
@@ -171,14 +178,14 @@ class Blockchain:
                         skip = True
                     #else:
                     #    print("NOT EQUAL")
-            self.log('recvAttestation', "CONSENSUS REACHED, keeping block")
+            self.log('recvAttestation', f"CONSENSUS REACHED, keeping block. ATTS: (+{positive}:-{negative})")
             self.log('recvAttestation', f'There are {self.state.getValidatorLen()} validators: {self.state.getValidators()}')
             self.consensus_reached = True
         else:
             # Negative supermajority is reached
             self.newAttestationList = []
             self.newBlock = None
-            self.log('recvAttestation', "CONSENSUS REACHED, discarding block")
+            self.log('recvAttestation', f"CONSENSUS REACHED, discarding block. ATTS: (+{positive}:-{negative})")
             self.consensus_reached = True
         return
 
@@ -418,7 +425,7 @@ class Blockchain:
         self.newBlock = bl
         # Validate block on consensus layer
         self.log('recvBlock', 'Starting block validation')
-        ret = self.cProt.attest(self.state, self.chain.rebuildHash(), self.chain.block_number, self.getReward(), bl)
+        ret = self.cProt.attest(self.state, self.chain.rebuildHash(), self.chain.block_number, self.getReward(), self.lastRoundValidatorCount, bl)
         self.log('recvBlock', f'Finished block validation as {"IN" if not ret[1] else ""}CORRECT')
         # print("CONSENSUS RETURNED THIS, ", ret)
         # Stop waiting for block
@@ -455,6 +462,7 @@ class Blockchain:
             acc = self.state.getAccount(self.address)
             self.account = acc if acc else AccSerializable.blank()
             self.gettingReady = False
+            self.lastRoundValidatorCount = self.state.getValidatorLen()
             return
         self.log('pushBlock', 'The current state is ahead of Genesis')
         # The current state is far, in the distance
@@ -478,10 +486,12 @@ class Blockchain:
             self.chain = nBlock
             self.state = nstate[0]
             self.cProt.randao.reseed(self.chain.randao_seed)
+            self.lastRoundValidatorCount = self.state.getValidatorLen()
         
         acc = self.state.getAccount(self.address)
         self.account = acc if acc else AccSerializable.blank()
         self.gettingReady = False
+        self.lastRoundValidatorCount = self.state.getValidatorLen()
         self.log('pushBlock', 'State updated')
         # print("WHOOOOOOOA")
             # Continue to the next block
@@ -525,12 +535,17 @@ class Blockchain:
         self.log('Main Logic Loop', "Shutdown complete")
 
     async def listenToUserInput(self):
+        blockwait = 0
+        blockno = 0
         while not self.shutdownEvent.is_set():
             await asyncio.sleep(4)
             if self.gettingReady:
                 continue
             if (len(self.peerAddresses) == 0):
                 continue
+            if (self.state.getAccount(self.address) is None):
+                continue
+            blockno = self.chain.block_number
             try:
                 if self.playStyle == 0:
                     # This style only sends TXs
@@ -538,23 +553,16 @@ class Blockchain:
                     self.peerAddresses = set(self.peerAddresses)
                     self.log('USER', f"Generating TX to [{to.hex()}]")
                     self.generateTX(0, random.randint(0, 1500), to, 10000)
-                if self.playStyle in (1, 2, 7, 8, 9, 10):
+                if self.playStyle in (1, 2, 5, 7, 8, 9, 10):
                     # This style gossips a registration Tx
                     # Then waits until it is in a block
                     # Then distributes SC
                     # Then sneds notmal Txs
-                    if (self.state.getAccount(self.address).isVerified()):
+                    if (self.state.getAccount(self.address).isVerified() and self.playStyle != 5):
                         if self.playStyle in (7, 8):
                             self.log('USER', 'Account has been verified!')
-                            # Find a validator capable of receiving SC
-                            #print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
-                            recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
-                            # Generate MetaTX of SC assignment
-                            if not self.generateTX(1, 0, recp, 5):
-                                continue
-                            self.log('USER', f'Endorsing {recp.hex()}')
                             if self.playStyle == 7:
-                                self.playStyle = 0
+                                self.playStyle = 5
                             else:
                                 #print(f'[{self.nodeId}]: Setting style from [{self.playStyle}] to [9].', flush=True)
                                 self.playStyle = 9
@@ -572,15 +580,29 @@ class Blockchain:
                                     continue
                                 else:
                                     self.log('USER', 'I AM A VALIDATOR :sunglasses emoji:')
-                                    self.playStyle = 0
+                                    blockwait = blockno + 2
+                                    self.playStyle = 5
                                     #print(f'[{self.nodeId}]: [genTX]: Setting style to 0 - {self.playStyle}.', flush=True)
-
+                    elif self.playStyle == 5:
+                        if blockwait == 0 or blockwait == blockno:
+                            if self.account.passive_sc == 0:
+                                self.playStyle = 0
+                                continue
+                            else:
+                                # Find a validator capable of receiving SC
+                                #print(f'[{self.nodeId}]: [genTX]: validators = {self.state.getValidators()}')
+                                recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
+                                # Generate MetaTX of SC assignment
+                                if not self.generateTX(1, 0, recp, random.randint(50, self.account.passive_sc)):
+                                    continue
+                                blockwait = self.chain.block_number + 2
+                                self.log('USER', f'Endorsing {recp.hex()}')
                     else:
                         if self.playStyle not in (7, 8):
-                            vczkp = await asyncio.to_thread(generate(self.nodeId + str(int(time.time()))))
+                            vczkp = await asyncio.to_thread(generate, self.nodeId + str(int(time.time())))
                             if not vczkp:
                                 continue
-                            print('GENERATED ZKPPPPPP: ' + vczkp.hex(), flush=True)
+                            # print('GENERATED ZKPPPPPP: ' + vczkp.hex(), flush=True)
                             if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=vczkp):
                                 continue
                             self.log('USER', 'ID hash send, waiting to get registered')
@@ -589,9 +611,6 @@ class Blockchain:
                             else:
                                 #print(f'[{self.nodeId}]: [genTX]: Setting style to 8.', flush=True)
                                 self.playStyle = 8
-
-# BlockSerializable(parent_hash=b'H\x138v\xf6\xdcE\x7f1\x08\xf6\xbf\xfc \x9f\xbd\x8b\xf0`n\x97\x05\xd0\x99\xcf\x9c\xcb/6\xf2\xff)', state_root=b'\xf0|\xd8\x96\xf9\x10\x94\xd7w\xc0\x08\xc5$\xb3\xd76\x1bb\x0c\x94\xa9\xe6\xc8z8\xc9\xc39\x83@^P', transactions_root=b"\xd3.\x98\xc2wXW\x1d\x03\x1a\xd6\xb1^'\xbc\xf3\xa7S:\xce\x90\xd3u\xce\x1b\xd3h\xf0\xb5\xd6\xdb\x96", attestations_root=b"\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", receipts_root=b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', epoch_number=0, block_number=1, randao_reveal=b'\xbb/\xa9\xe7\x80\x86YB\x0b\xde\x15\xedN\xc2\xd0\x90|\xe1\xdc\x85\\\x8a\xcc\x05A\x97\xd8\xad\xd0\x02\x01\xb8\x11\x94\x87L\xda<fD\x03\x8e\x0fYw\xd7\xb9tBA:\xb5\xe0-\xe4d|A|C\x06\xca3^\x01', randao_seed=b'\x00', beneficiary=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', timestamp=1747056311, sig_v=1, sig_r=39982920287527697783335693781090821103642387430224504891618268610284025687319, sig_s=48000689032208177769465337186323675556866325199611619492687995999218450658109, data=b'', transactions=(TxSerializable(nonce=0, type=0, fee=1003, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056290, data=b'', v=1, r=97002484183267719760991897808404123263486833262677495044139201273440516512907, s=29692514204150938973460397411460477373447492408132867519384590201803034437385), TxSerializable(nonce=1, type=0, fee=905, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056294, data=b'', v=1, r=70318301139114886979823939533574425134083299656563170061899609605681988843700, s=35141926362186345520198511962782870215218420452510788876210053605227576553261), TxSerializable(nonce=2, type=0, fee=652, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056298, data=b'', v=1, r=106162852652452073661339414748185419327624573366803171157769666824995684689542, s=51064812645936514111524761255195089598087754823317502113228879079757433628770), TxSerializable(nonce=3, type=0, fee=1012, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056302, data=b'', v=0, r=1418407079623880751859391599015542361576698396923465278818457659036260549325, s=42302537586179422804312985062242589634447345721028001029991976689797993592929), TxSerializable(nonce=4, type=0, fee=593, sender=b'\x8b\xfc\x19\xd4\x1dQ\x060\xabT\xb9\x12\x92\xee<\xaa\r\xbf8\x84', to=b'\xe2\xde\xc4#XL\xf9\x00:\xad\xc6\xdfj\r\x07\xdc#naJ', value=10000, timestamp=1747056306, data=b'', v=1, r=47424605764677307055742008560370012955487540274907545826470722569888542863713, s=9765453466824945638908139698327387661931055674112314335113840189153552326098)), attestations=())
-
             except Exception as e:
                 self.log('USER', f'ERROR HAPPENED: {e}')
 
@@ -628,6 +647,7 @@ class Blockchain:
             self.reassignRequest(TxMeta.ddeserialize(msg.params[0].value))
         elif procCall == '/setNodeID':
             self.nodeId = msg.params[0].value.decode('utf-8')
+            self.state.nodeID = self.nodeId
             self.log('Message from Network', f"Node ID set: {self.nodeId}")
         elif procCall == '/getAddress':
             resp = RPC.constructRPC('/setAddress', [Param.constructParam('addr', 3, self.address)])
@@ -693,5 +713,9 @@ class Blockchain:
                 await asyncio.sleep(0.1)
             # 13. Rinse and Repeat!
             self.log("---NEXT ROUND---")
+            # 14. Update own account from state
+            self.updateAccount()
+            self.log('GameplayLoop', 'Account Updated')
+            # 15. Reseed RANDAO
             self.cProt.randao.reseed(self.chain.randao_seed)
             self.log('GameplayLoop', f"RANDAO reseeded ({self.cProt.randao.get_seed().hex()})")

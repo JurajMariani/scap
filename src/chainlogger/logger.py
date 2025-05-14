@@ -17,7 +17,7 @@ def setupLogger(queue):
 def loggerListener(queue, logfile: str = 'log.log'):
     """Process that listens to the queue and writes logs to a file."""
     handler = logging.FileHandler(logfile, mode='w')
-    formatter = logging.Formatter('[%(asctime)s] %(message)s')
+    formatter = logging.Formatter('[[%(asctime)s] %(message)s')
     handler.setFormatter(formatter)
     
     logger = logging.getLogger('listener')
