@@ -236,9 +236,6 @@ class StateTrie:
         accBenef = self.getAccount(tx.to)
         # Check NONCE
         if accSender.nonce != tx.nonce:
-            # print("NONCE DOES NOT MATCH!", accSender.nonce, tx.nonce)
-            return False
-        if accSender.balance < (tx.value + tx.fee):
             return False
         # Initiate swap
         updatedSender = accSender.update(nonce=True, balance=(accSender.balance - (tx.value + tx.fee)))
@@ -284,6 +281,8 @@ class StateTrie:
         if (not self.verifyTX(tx, accSender, execute)):
             return False
         # Check sender funds
+        if (accSender.balance < tx.value + tx.fee):
+            return False
         return True
     
     def verifyReassign(self, tx: TxSerializable, execute: bool) -> bool:
