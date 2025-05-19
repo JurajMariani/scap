@@ -239,7 +239,12 @@ class Blockchain:
         randao_seed = bytes.fromhex(self.config['sc_constants']['domain_randao']) + BlockSerializable.int_to_minimal_bytes(self.chain.block_number + 1)
         randao_seed = keccak(randao_seed)
         # Get new state hash
-        stateHash = BlockSerializable.getStateAfterExec(self.state, txs, self.address, self.getReward())[0].getRootHash()
+        stateHash = self.state.getRootHash()
+        try:
+            stateHash = BlockSerializable.getStateAfterExec(self.state, txs, self.address, self.getReward())[0].getRootHash()
+        except Exception as e:
+            self.log('generateBlock', f'EXCEPTION: {e}')
+            traceback.print_exc()
         # Construct a block
         bl = BlockNoSig(
             self.chain.rebuildHash(),
@@ -608,6 +613,7 @@ class Blockchain:
         """
         blockwait = 0
         blockno = 0
+        vczkp = b''
         while not self.shutdownEvent.is_set():
             await asyncio.sleep(4)
             if self.gettingReady:
@@ -667,12 +673,13 @@ class Blockchain:
                                 self.log('USER', f'Endorsing {recp.hex()}')
                     else:
                         if self.playStyle not in (7, 8):
-                            vczkp = await asyncio.to_thread(generate, self.nodeId + str(int(time.time())))
                             if not vczkp:
-                                continue
+                                vczkp = await asyncio.to_thread(generate, self.nodeId + str(int(time.time())))
+                                if not vczkp:
+                                    continue
                             if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=vczkp):
                                 continue
-                            self.log('USER', 'ID hash send, waiting to get registered')
+                            self.log('USER', 'ID hash sent, waiting to get registered')
                             if self.playStyle == 1:
                                 self.playStyle = 7
                             else:

@@ -34,10 +34,6 @@ class StateTrie:
         self.db = {}
         self.state_trie = HexaryTrie(self.db)
         self.valAddrList: dict[bytes, int] = {}
-        # TODO
-        # For the time being, this remains unused
-        # Can be used in the future for optimisation
-        # TODO
         self.nodeID = ''
         self.iddb = {}
         self.id_trie = HexaryTrie(self.iddb)
@@ -78,6 +74,17 @@ class StateTrie:
             return self.affiliate(tx, verify, execute)
         else:
             print('Wrong transaction type.')
+            return False
+        
+    def checkUniqueness(self, id_hash: bytes) -> bool:
+        if len(id_hash) != 32:
+            return False
+        return not id_hash in self.id_trie
+
+    def registerIdHash(self, id_hash: bytes) -> bool:
+        if self.checkUniqueness(id_hash):
+            self.id_trie[id_hash] = b'\x01'
+        else:
             return False
 
     def addAccount(self, acc: AccSerializable, address: bytes) -> None:
@@ -231,8 +238,10 @@ class StateTrie:
         if accSender.nonce != tx.nonce:
             # print("NONCE DOES NOT MATCH!", accSender.nonce, tx.nonce)
             return False
+        if accSender.balance < (tx.value + tx.fee):
+            return False
         # Initiate swap
-        updatedSender = accSender.update(nonce=True, balance=(accSender.balance - tx.value - tx.fee))
+        updatedSender = accSender.update(nonce=True, balance=(accSender.balance - (tx.value + tx.fee)))
         updatedRec = accBenef.update(balance=(accBenef.balance + tx.value))
         # Record changes
         self.updateAccount(tx.sender, updatedSender)
@@ -275,8 +284,6 @@ class StateTrie:
         if (not self.verifyTX(tx, accSender, execute)):
             return False
         # Check sender funds
-        if (accSender.balance < tx.value + tx.fee):
-            return False
         return True
     
     def verifyReassign(self, tx: TxSerializable, execute: bool) -> bool:
@@ -406,6 +413,8 @@ class StateTrie:
         d = decode(tx.data, RegisterData)
         if d.id_hash == b'':
             return False
+        if not self.checkUniqueness(d.id_hash):
+            return False
         if d.vc_zkp == b'':
             return False
         # Verify ZKP
@@ -441,6 +450,7 @@ class StateTrie:
             return False
         accUpdated = accSender.update(nonce=True, balance=(accSender.balance - tx.fee), id_hash=regd.id_hash, vc_zkp=regd.vc_zkp, passive_sc=passSc)
         self.updateAccount(tx.sender, accUpdated)
+        self.registerIdHash(regd.id_hash)
         return True
     
     def verifyAffiliate(self, tx: TxSerializable, execute: bool) -> bool:

@@ -28,12 +28,12 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="2.025849"
-     inkscape:cx="282.10394"
-     inkscape:cy="139.4477"
+     inkscape:cx="183.87353"
+     inkscape:cy="212.99712"
      inkscape:window-width="1920"
      inkscape:window-height="991"
      inkscape:window-x="-9"
-     inkscape:window-y="-9"
+     inkscape:window-y="1341"
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1"
      showguides="false" />
@@ -60,18 +60,19 @@
     <text
        xml:space="preserve"
        style="font-style:italic;font-size:2.82222px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke:#000000;stroke-width:0;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-       x="46.516697"
-       y="29.725731"
+       x="48.018646"
+       y="30.05224"
        id="text1140"><tspan
          sodipodi:role="line"
          style="font-style:normal;font-weight:normal;font-size:2.82222px;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none"
-         x="46.516697"
-         y="29.725731"
-         id="tspan590">1) Transaction containing ZK proof of identity</tspan><tspan
+         x="48.018646"
+         y="30.05224"
+         id="tspan590"
+         dy="-0.76999998">1) Transaction containing ZK proof of identity</tspan><tspan
          sodipodi:role="line"
          style="font-style:normal;font-weight:normal;font-size:2.82222px;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none"
-         x="46.516697"
-         y="33.254227"
+         x="48.018646"
+         y="33.580734"
          id="tspan462">&amp; ID hash to be stored on chain</tspan></text>
     <rect
        style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0382282;stroke-linejoin:round;stroke-dasharray:none"
@@ -129,17 +130,18 @@
        xml:space="preserve"
        style="font-style:italic;font-size:2.82222px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke:#000000;stroke-width:0;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
        x="48.104198"
-       y="39.25074"
+       y="39.518707"
        id="text595"><tspan
          sodipodi:role="line"
          style="font-style:normal;font-weight:normal;font-size:2.82222px;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none"
          x="48.104198"
-         y="39.25074"
-         id="tspan593">2) Verification is conducted by every validator</tspan><tspan
+         y="39.518707"
+         id="tspan593"
+         dy="-0.76999998">2) Verification is conducted by every validator</tspan><tspan
          sodipodi:role="line"
          style="font-style:normal;font-weight:normal;font-size:2.82222px;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none"
          x="48.104198"
-         y="42.779236"
+         y="43.047203"
          id="tspan599">when Tx(1) is included in a block</tspan></text>
     <g
        id="g567">

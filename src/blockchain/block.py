@@ -480,9 +480,11 @@ class BlockSerializable(Serializable):
         The validity of the block can be inferred from the boolean value.
         """
         # 1. - 4. Execute TXs
+        res = (state, True)
         try:
             res = self.getStateAfterExecution(state, currReward)
         except Exception as e:
+            res = (state, False)
             print(e)
         # In case of incorrect TXs
         if not res[1]:
