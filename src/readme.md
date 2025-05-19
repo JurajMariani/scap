@@ -14,11 +14,11 @@ The requirements are as follows:
 
 - Python:
   - `python3.10`
-  - `pycryptodome`
-  - `eth_keys`
-  - `eth_utils`
-  - `rlp`
-  - `trie`
+  - `pycryptodome` ver 3.22.0
+  - `eth_keys` ver 0.7.0
+  - `eth_utils` ver 5.3.0
+  - `rlp` ver 4.1.0
+  - `trie` ver 3.1.0
 - ZoKrates:
   - installed and operational
   - exported in the `$PATH` variable as to be reachable from anywhere
