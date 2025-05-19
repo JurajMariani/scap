@@ -3,7 +3,7 @@
 - **Author:** Bc. Juraj Mariani  
 - **Supervisor:** doc. Ing. Ivan Homoliak, Ph.D.
 
-![logo](./img/scap_logo.png)
+![logo](./Excel@FIT/nahled.png)
 
 ## Table of Contents
 
