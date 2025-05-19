@@ -28,12 +28,12 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="3.0609708"
-     inkscape:cx="95.557919"
-     inkscape:cy="73.996133"
+     inkscape:cx="113.03603"
+     inkscape:cy="91.3109"
      inkscape:window-width="1920"
      inkscape:window-height="991"
      inkscape:window-x="-9"
-     inkscape:window-y="-9"
+     inkscape:window-y="1341"
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1" />
   <defs
@@ -297,7 +297,8 @@
            width="11.726834"
            height="5.7268338"
            x="0.13658293"
-           y="0.13658293" />
+           y="0.13658293"
+           ry="0.68463236" />
         <text
            xml:space="preserve"
            style="font-style:italic;font-size:3.00366px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#000000;stroke:#000000;stroke-width:0;stroke-linejoin:round"
@@ -320,7 +321,7 @@
          transform="matrix(0.76000001,0,0,0.77238641,6.6237161,28.500712)">
         <g
            id="g1454"
-           transform="matrix(0.55835042,0,0,0.64272348,24.610743,8.1490397)">
+           transform="matrix(0.55835042,0,0,0.64272348,24.610743,7.0953563)">
           <rect
              style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.1;stroke-linejoin:round;stroke-dasharray:none"
              id="rect1398"
@@ -539,13 +540,13 @@
            xml:space="preserve"
            style="font-style:italic;font-size:3.175px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0899999;stroke-linejoin:round;stroke-dasharray:none"
            x="44.50668"
-           y="35.682663"
+           y="35.801361"
            id="text1458"><tspan
              sodipodi:role="line"
              id="tspan1456"
              style="font-style:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.09;stroke-opacity:1"
              x="44.50668"
-             y="35.682663">IDP Blockchain</tspan></text>
+             y="35.801361">IDP Blockchain</tspan></text>
         <rect
            style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.157323;stroke-linejoin:round;stroke-opacity:1"
            id="rect1460"
@@ -558,24 +559,24 @@
          xml:space="preserve"
          style="font-style:italic;font-size:1.41111px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman,  Italic';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
          x="40.842812"
-         y="53.948692"
+         y="53.826454"
          id="text1580"><tspan
            sodipodi:role="line"
            id="tspan1578"
            style="font-style:normal;fill:#000000;fill-opacity:1;stroke-width:0.16"
            x="40.842812"
-           y="53.948692">2. Internal BFT consensus</tspan></text>
+           y="53.826454">2) Internal BFT consensus</tspan></text>
     </g>
     <g
        id="g2300"
        transform="matrix(1,0,0,-1,-25.897376,54.499656)">
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0810365;stroke-linejoin:round;stroke-dasharray:none"
+         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.082207;stroke-linejoin:round;stroke-dasharray:none"
          id="rect2296"
-         width="13.103637"
-         height="0.10147196"
-         x="-31.398149"
-         y="-40.471394"
+         width="13.292901"
+         height="0.10293759"
+         x="-31.396805"
+         y="-40.47287"
          transform="matrix(-0.90391992,0.42770173,-0.42699018,-0.90425626,0,0)" />
       <path
          sodipodi:type="star"
@@ -600,12 +601,12 @@
        id="g2294"
        transform="translate(-25.897376,-6.7739648)">
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0810365;stroke-linejoin:round;stroke-dasharray:none"
+         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0819143;stroke-linejoin:round;stroke-dasharray:none"
          id="rect1734"
-         width="13.103637"
-         height="0.10147196"
-         x="-31.398149"
-         y="-40.471394"
+         width="13.245584"
+         height="0.10257117"
+         x="-31.397141"
+         y="-40.4725"
          transform="matrix(-0.90391992,0.42770173,-0.42699018,-0.90425626,0,0)" />
       <path
          sodipodi:type="star"
@@ -629,17 +630,17 @@
     <text
        xml:space="preserve"
        style="font-size:1.40229px;font-family:SimSun-ExtB;-inkscape-font-specification:SimSun-ExtB;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.06;stroke-dasharray:none;stroke-opacity:1"
-       x="-0.58977044"
-       y="23.020329"
+       x="-0.63147736"
+       y="22.905422"
        id="text2304"
        transform="rotate(-25.050895)"><tspan
          sodipodi:role="line"
          id="tspan2302"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.40229px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.06;stroke-dasharray:none;stroke-opacity:1"
-         x="-0.58977044"
-         y="23.020329"><tspan
+         x="-0.63147736"
+         y="22.905422"><tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.41111px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';stroke:none"
-   id="tspan2306">1a.</tspan> Send ID hash</tspan></text>
+   id="tspan2306">1a)</tspan> Send ID hash</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.41111px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0600001;stroke-dasharray:none;stroke-opacity:1"
@@ -651,20 +652,20 @@
          id="tspan2318"
          style="stroke-width:0.06"
          x="19.774832"
-         y="19.303135">1b. Send ID hash </tspan><tspan
+         y="19.303135">1b) Send ID hash </tspan><tspan
          sodipodi:role="line"
          style="stroke-width:0.06"
          x="19.774832"
          y="21.067022"
          id="tspan2322">&amp; Identity ZKPs</tspan></text>
     <rect
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0682924;stroke-linejoin:round;stroke-dasharray:none"
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0660776;stroke-linejoin:round;stroke-dasharray:none"
        id="rect2324"
-       width="7.9126606"
-       height="0.11934333"
-       x="21.128244"
-       y="29.172985"
-       transform="matrix(-0.00198321,0.99999803,0.99999999,1.1870701e-4,0,0)" />
+       width="7.2882051"
+       height="0.12130078"
+       x="21.440535"
+       y="29.177164"
+       transform="matrix(-0.00218845,0.99999761,0.99999999,1.0757436e-4,0,0)" />
     <path
        sodipodi:type="star"
        style="fill:#040404;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
@@ -680,10 +681,11 @@
        inkscape:rounded="0"
        inkscape:randomized="0"
        d="m 18.155193,1.8336208 -0.597688,0.3450749 -0.597687,0.3450749 0,-0.6901498 0,-0.6901498 0.597687,0.3450749 z"
-       transform="matrix(0,-0.96139991,-1,0,31.016419,38.009306)"
+       transform="matrix(0,-0.96139991,-1,0,31.016419,38.322383)"
        inkscape:transform-center-x="-0.19922888" />
     <g
-       id="g497">
+       id="g497"
+       transform="matrix(1.1800113,0,0,1.1800113,-5.2277629,-3.3877404)">
       <rect
          style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.128041;stroke-dasharray:none;stroke-opacity:1"
          id="rect2386"
@@ -706,22 +708,27 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.41111px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.121;stroke-dasharray:none;stroke-opacity:1"
-       x="19.387518"
-       y="25.567165"
+       x="29.848619"
+       y="23.450497"
        id="text3120"><tspan
          sodipodi:role="line"
          id="tspan3118"
          style="stroke-width:0.121"
-         x="19.387518"
-         y="25.567165">3.  Query 1a.  ID  hash validity</tspan></text>
+         x="29.848619"
+         y="23.450497">3)  Query 1a) </tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.121"
+         x="29.848619"
+         y="25.214384"
+         id="tspan505">ID hash validity</tspan></text>
     <rect
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0682553;stroke-linejoin:round;stroke-dasharray:none"
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.0659594;stroke-linejoin:round;stroke-dasharray:none"
        id="rect3122"
-       width="7.9018931"
-       height="0.11937612"
-       x="-28.394844"
-       y="26.957987"
-       transform="matrix(-0.00198646,-0.99999803,0.99999999,-1.1851291e-4,0,0)" />
+       width="7.2559094"
+       height="0.12140523"
+       x="-28.082628"
+       y="26.951717"
+       transform="matrix(-0.00220008,-0.99999758,0.99999999,-1.0700553e-4,0,0)" />
     <path
        sodipodi:type="star"
        style="fill:#040404;fill-opacity:1;stroke:none;stroke-width:0.16;stroke-linejoin:round;stroke-opacity:1"
@@ -737,7 +744,7 @@
        inkscape:rounded="0"
        inkscape:randomized="0"
        d="m 18.155193,1.8336208 -0.597688,0.3450749 -0.597687,0.3450749 0,-0.6901498 0,-0.6901498 0.597687,0.3450749 z"
-       transform="matrix(0,0.96139991,-1,0,28.899751,11.547148)"
+       transform="matrix(0,0.96139991,-1,0,28.899751,11.234071)"
        inkscape:transform-center-x="-0.19922888" />
     <g
        id="g3130"
@@ -772,19 +779,19 @@
     <text
        xml:space="preserve"
        style="font-size:1.40229px;font-family:SimSun-ExtB;-inkscape-font-specification:SimSun-ExtB;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.06;stroke-dasharray:none;stroke-opacity:1"
-       x="-1.5851909"
-       y="25.67804"
+       x="-1.6583902"
+       y="25.834656"
        id="text3136"
        transform="rotate(-25.050895)"><tspan
          sodipodi:role="line"
          id="tspan3134"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.40229px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.06;stroke-dasharray:none;stroke-opacity:1"
-         x="-1.5851909"
-         y="25.67804">4. Registered/Denied</tspan><tspan
+         x="-1.6583902"
+         y="25.834656">4) Registered/Denied</tspan><tspan
          sodipodi:role="line"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.40229px;font-family:'Times New Roman';-inkscape-font-specification:'Times New Roman, ';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.06;stroke-dasharray:none;stroke-opacity:1"
-         x="-1.5851909"
-         y="27.566578"
+         x="-1.6583902"
+         y="27.723196"
          id="tspan3138"
          rotate="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0">         based on step 3.</tspan></text>
     <text
@@ -801,7 +808,7 @@
          y="14.585406" /></text>
     <g
        id="g505"
-       transform="translate(0,10.175712)">
+       transform="matrix(1.180044,0,0,1.180044,-5.1964668,6.4739539)">
       <rect
          style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.128041;stroke-dasharray:none;stroke-opacity:1"
          id="rect499"
