@@ -1,8 +1,27 @@
+"""
+blockchain/account.py
+
+This module defines serializable classes for user account & Tx payload for account modification.
+
+Example:
+    You can use this as a module:
+        from blockchain.account import AccountSerializable (, *)
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from rlp import encode, decode, Serializable
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
 
 class AffiliateMedia(Serializable):
+    """
+    Serializable class, used for social media registration (to become a consensus node).
+
+    In case a consensus node wants to no longer be a consensus node,
+    it has to send a registration transaction with add_flag set to False
+    """
     fields = [
         ('add_flag', Binary.fixed_length(1, allow_empty=False)),
         ('media', binary),
@@ -10,24 +29,52 @@ class AffiliateMedia(Serializable):
     ]
 
 class AffiliateMediaList(Serializable):
+    """
+    Class containing a list of social media.
+
+    The validator's public key is a necessity for randao.
+    Every consensus node needs to have one.
+    Therefore, it is sent in a registration transaction.
+    """
     fields = [
         ('media', CountableList(AffiliateMedia)),
         ('validator_pub_key', Binary.fixed_length(64, allow_empty=False))
     ]
 
 class Endorsement(Serializable):
+    """
+    Endorsement payload class.
+
+    Address denotes the social capital beneficiary,
+    value denotes the amount of social capital awarded.
+    Could be found in the data filed of a TxMeta
+    """
     fields = [
         ('address', Binary.fixed_length(20, allow_empty=False)),
         ('value', big_endian_int)
     ]
 
 class RegisterData(Serializable):
+    """
+    A Tx data payload sent by a node that wants to register their identity on-chain in a privacy-preserving way.
+
+    A keccak() hash is expected along with the use of a provided ZKP circuit '/src/zkp/verifyVC.zok'
+    To handle the ZKP generation and verification, a high-level wrapper is implemented in '/src/blockchain/zkp_manager.py'
+    """
     fields = [
         ('id_hash', Binary.fixed_length(32, allow_empty=True)),
         ('vc_zkp', Binary.fixed_length(288, allow_empty=True))
     ]
 
 class AccSerializable(Serializable):
+    """
+    Class Account stores all data associated with one's account.
+
+    Used as a basis for the STATE of the blockchain.
+    Although the filed 'effective_sc' is present, it is currently unused as effective social capital
+    is dynamically calculated based on the current scaling fn (and active social capital') in '/src/blockchain/consensus.py'
+    The 'validator_pub_key', originally a BLS key, is replaced with a normal Ethereum key
+    """
     fields = [
         ('nonce', big_endian_int), # no of txs sent
         ('forwarder', big_endian_int),
@@ -45,11 +92,19 @@ class AccSerializable(Serializable):
     ]
 
     def isVerified(self) -> bool:
+        """
+        Returns TRUE if this user is verified.
+        """
         if (self.id_hash in (None, b'\x00' * 32) or self.vc_zkp in (None, b'\x00' * 288)):
             return False
         return True
 
     def isConsensusNode(self) -> bool:
+        """
+        Returns TRUE if this node is a consensus node.
+
+        To be a consensus node means to be verified and have at least one social media associated with your account.
+        """
         if (not self.isVerified()):
             return False
         if (not self.soc_media):
@@ -64,6 +119,14 @@ class AccSerializable(Serializable):
         validator_pub_key: bytes | None = None, endorsed: list[Endorsement] | None = None,
         endorsed_by: list[Endorsement] | None = None, soc_media: list[AffiliateMedia] | None = None
     ) -> AccSerializable:
+        """
+        A monolith used to update an account.
+
+        Implemented for ease of use.
+        
+        NOTE:
+        This method returns a new instance of 'AccSerializable' as any 'rlp.Serializable' class is immutable.
+        """
         return AccSerializable(
             self.nonce + 1 if nonce else self.nonce,
             self.forwarder + 1 if forwarder else self.forwarder,
@@ -81,6 +144,9 @@ class AccSerializable(Serializable):
     
     @classmethod
     def blank(cls) -> AccSerializable:
+        """
+        A constructor for an empty account.
+        """
         return AccSerializable(
             0,              # nonce
             0,              # forwarder
@@ -97,41 +163,18 @@ class AccSerializable(Serializable):
         )
     
     def sserialize(self) -> bytes:
+        """
+        Method used to serialize the class.
+
+        Wrapper for function 'rlp.encode()'
+        """
         return encode(self)
     
     @classmethod
     def ddeserialize(cls, acc: bytes) -> AccSerializable:
+        """
+        Deserializator.
+
+        Wrapper for 'rlp.decode(bytes, SerializableClass)'
+        """
         return decode(acc, AccSerializable)
-
-class Account():
-    def __init__(self, non, bal):
-        self.nonce = non
-        self.forwarder = 0 # nonce for metaTX
-        self.balance = bal
-        self.id_hash = b''
-        self.vc_zkp = b''
-        self.passive_sc = 0
-        self.active_sc = 0
-        self.effective_sc = 0
-        self.endorsed = []
-        self.affiliateMedia = {}
-    
-    def register(self, id, zkp):
-        pass
-    
-    def endorse(self, benef: bytes, amount: int):
-        '''if (not self.id_hash):
-            raise ValueError('Can\'t endorse without a valid identity.')
-    
-        if (self.passive_sc < amount):
-            raise ValueError('Can\'t endorse, not enough social capital.')
-    
-        self.passive_sc -= amount
-        self.endorsed.append((benef, amount))'''
-        pass
-
-
-    def sserialize(self):
-        pass
-        #return encode(AccSerializable(self.nonce, self.balance, self.id_hash, self.vc_zkp, self.passive_sc, self.active_sc, self.effective_sc))
-    

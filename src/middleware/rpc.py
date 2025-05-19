@@ -1,21 +1,37 @@
+"""
+middleware/rpc.py
+
+This module defines an interface of a Remote Procedure Call message passed between the blockchain and node processes.
+
+Example:
+    You can use this as a module:
+        from middleware.rpc import RPC, Param
+
+    Parameter value types:
+        0. int
+        1. str
+        2. float
+        3. bytes
+        4. BlockSerializable
+        5. TxSerializable
+        6. TxMeta
+        7. Attestation
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import Binary, binary, big_endian_int, CountableList
 from network.peer import fit_X, to_int, Peer
 
-"""
-TYPES:
-0. int
-1. str
-2. float
-3. bytes
-4. BlockSerializable
-5. TxSerializable
-6. TxMeta
-7. Attestation
-"""
-
 class Param(Serializable):
+    """
+    Serializable parameter class
+
+    Used in the RPC class
+    """
     fields = [
         ('name', binary),
         ('type', Binary.fixed_length(1)),
@@ -36,6 +52,12 @@ class Param(Serializable):
         return Param(name.encode('ascii'), fit_X(type, 1), value)
 
 class RPC(Serializable):
+    """
+    Message passing class between the network layer and the blockchain layer.
+
+    NOTE:
+    The fields 'phase' and 'layer' are currently unused.
+    """
     fields = [
         ('phase', Binary.fixed_length(1)),
         ('layer', Binary.fixed_length(1)),

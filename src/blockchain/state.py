@@ -1,7 +1,19 @@
+"""
+blockchain/state.py
+
+This module defines a class maintaining the state of accounts.
+
+Example:
+    You can use this as a module:
+        from blockchain.state import StateTrie
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from trie import HexaryTrie
 from eth_utils import keccak
-import asyncio
 import json
 import time
 
@@ -15,6 +27,9 @@ from blockchain.account import AccSerializable, Endorsement, RegisterData, Affil
 # and may be useful to shorten this code
 # TODO
 class StateTrie:
+    """
+    Class keeping the state of accounts
+    """
     def __init__(self):
         self.db = {}
         self.state_trie = HexaryTrie(self.db)
@@ -29,6 +44,9 @@ class StateTrie:
 
     
     def clone(self) -> StateTrie:
+        """
+        Create a new instance of the state (with shallow copies)
+        """
         st = StateTrie()
         st.db = self.db.copy()
         st.valAddrList = self.valAddrList.copy()
@@ -39,6 +57,12 @@ class StateTrie:
         return st
 
     def transaction(self, tx: TxSerializable, verify: bool = True, execute: bool = True) -> bool:
+        """
+        Entry point.
+
+        Returns TRUE if the transaction is correct.
+        Can verify and execute the reansaction based on input flags.
+        """
         type = tx.type
         if type == 0:
             # Normal transaction
@@ -57,10 +81,16 @@ class StateTrie:
             return False
 
     def addAccount(self, acc: AccSerializable, address: bytes) -> None:
+        """
+        Add account to trie.
+        """
         key = keccak(address)
         self.state_trie[key] = acc.sserialize()
 
     def getAccount(self, address: bytes) -> AccSerializable | None:
+        """
+        Request an account.
+        """
         key = keccak(address)
         try:
             acc = self.state_trie[key]
@@ -72,23 +102,39 @@ class StateTrie:
             return None
 
     def updateAccount(self, address: bytes, acc: AccSerializable) -> None:
+        """
+        Update account.
+        Similar to 'addAccount'
+        """
         key = keccak(address)
         self.state_trie[key] = acc.sserialize()
 
     def accountExists(self, acc: bytes) -> bool:
+        """
+        Returns TRUE if the address leads to an account.
+        """
         key = keccak(acc)
         return key in self.state_trie
 
     def removeAccount(self, address: bytes) -> None:
+        """
+        Removes account from the trie.
+        """
         key = keccak(address)
         del self.state_trie[key]
 
     def getValidator(self, address: bytes) -> bool:
+        """
+        Returns TRUE if address leads to a validator.
+        """
         if isinstance(address, str):
             raise TypeError("addValidator accepts bytes")
         return address in self.valAddrList.keys()
 
     def addValidator(self, address: bytes, sc: int) -> None:
+        """
+        Add a validator to the list.
+        """
         if isinstance(address, str):
             raise TypeError("addValidator accepts bytes")
         self.valAddrList[address] = sc
@@ -97,6 +143,9 @@ class StateTrie:
         del self.valAddrList[address]
 
     def getValidators(self) -> dict[bytes, int]:
+        """
+        Returns a list (dictionary of [address: active soc capital]) of all validators.
+        """
         return self.valAddrList
     
     def getValidatorLen(self) -> int:
@@ -115,6 +164,11 @@ class StateTrie:
         return self.state_trie.root_hash
     
     def coinbase(self, beneficiary: bytes, value: int) -> bool:
+        """
+        Increase the beneficiary's balance with the block reward.
+
+        Context: Execution of a proposed block.
+        """
         benef = self.getAccount(beneficiary)
         if not benef:
             return False
@@ -161,6 +215,9 @@ class StateTrie:
 
     
     def transfer(self, tx: TxSerializable, verify: bool, execute: bool) -> bool:
+        """
+        Verifies and executes (based on flags) the incomming transfer (type 0) transaction.
+        """
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if (verify):
@@ -183,6 +240,11 @@ class StateTrie:
         return True
 
     def verifyMetaTX(self, meta: TxMeta) -> bool:
+        """
+        Verifies a meta transaction (included as data in a normal transaction).
+
+        Context: A Meta Tx is being executed, wrapped in a normal tx by the social capital receiver.
+        """
         # Verify signature
         if not meta.verifySig():
             return False
@@ -205,6 +267,9 @@ class StateTrie:
         return True
     
     def verifyTransfer(self, tx: TxSerializable, execute: bool) -> bool:
+        """
+        Verify transfer-specifics.
+        """
         accSender = self.getAccount(tx.sender)
         # Verify TX common
         if (not self.verifyTX(tx, accSender, execute)):
@@ -215,6 +280,9 @@ class StateTrie:
         return True
     
     def verifyReassign(self, tx: TxSerializable, execute: bool) -> bool:
+        """
+        Verify a social capital reassign-specifics.
+        """
         accSender = self.getAccount(tx.sender)
         # Verify TX common
         if (not self.verifyTX(tx, accSender, execute)):
@@ -252,6 +320,9 @@ class StateTrie:
         return -1
 
     def reassign(self, tx: TxSerializable, verify, execute) -> bool:
+        """
+        Verify and execute (based on flags) a social capital reassign Tx.
+        """
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
@@ -324,6 +395,9 @@ class StateTrie:
         return True
     
     def verifyRegister(self, tx: TxSerializable, execute: bool) -> bool:
+        """
+        Verify an identity registration tx.
+        """
         sender = self.getAccount(tx.sender)
         # Verify common TX elements
         if (not self.verifyTX(tx, sender, execute)):
@@ -337,11 +411,13 @@ class StateTrie:
         # Verify ZKP
         valid = verify(d.vc_zkp, self.nodeID + str(int(time.time())))
         if (not valid):
-            # print('INVALID ZKPPPPPPPPPPPPP!', flush=True)
             return False
         return True
 
     def register(self, tx: TxSerializable, verify, execute) -> bool:
+        """
+        Verify and execute (based on flags) an ID registration Tx.
+        """
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:
@@ -368,6 +444,9 @@ class StateTrie:
         return True
     
     def verifyAffiliate(self, tx: TxSerializable, execute: bool) -> bool:
+        """
+        Verify affiliated social media account validity.
+        """
         acc = self.getAccount(tx.sender)
         # Verify common TX elements
         if (not self.verifyTX(tx, acc, execute)):
@@ -394,6 +473,9 @@ class StateTrie:
         return -1
     
     def affiliate(self, tx: TxSerializable, verify, execute) -> bool:
+        """
+        Verify and execute (based on flags) a social media registration (type 3) Tx.
+        """
         # Verification (of all txs in a block) should be done before application
         # That would, thus, not require the implementation of operation reverts & tabkeeping
         if verify:

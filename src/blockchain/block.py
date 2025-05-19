@@ -1,3 +1,16 @@
+"""
+blockchain/block.py
+
+This module defines serializable classes blocks and attestations, along with modification methods.
+
+Example:
+    You can use this as a module:
+        from blockchain.block import BlockSerializable, Attestation (, *)
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
@@ -6,11 +19,16 @@ from eth_utils import keccak
 from trie import HexaryTrie
 from copy import deepcopy
 
-from blockchain.transaction import Transaction, TxSerializable
+from blockchain.transaction import TxSerializable
 from blockchain.state import StateTrie
 import json
 
 class AttestationNoSig(Serializable):
+    """
+    Attestation class without a signature.
+
+    Used to create a signed version.
+    """
     fields = [
         ('sender', Binary.fixed_length(20, allow_empty=False)),
         ('block_hash', Binary.fixed_length(32, allow_empty=False)),
@@ -18,9 +36,15 @@ class AttestationNoSig(Serializable):
     ]
 
     def hash(self) -> bytes:
+        """
+        Used to get a keccak hash of the bytes representation.
+        """
         return keccak(encode(self))
     
     def sign(self, privK: bytes) -> Attestation:
+        """
+        Sign the Attestation and thereby create a 'Attestation' class instance.
+        """
         sk = keys.PrivateKey(privK)
         sig = sk.sign_msg_hash(self.hash())
         return Attestation(
@@ -33,6 +57,9 @@ class AttestationNoSig(Serializable):
         )
 
 class Attestation(Serializable):
+    """
+    Class used to record (on-chain) and send attestations of a current proposed block.
+    """
     fields = [
         ('sender', Binary.fixed_length(20, allow_empty=False)),
         ('block_hash', Binary.fixed_length(32, allow_empty=False)),
@@ -43,6 +70,11 @@ class Attestation(Serializable):
     ]
 
     def hash(self) -> bytes:
+        """
+        Wrapper used to get a hash of the attestation body.
+
+        Wrapper for 'AttestationNoSig's hash function.'
+        """
         atns = AttestationNoSig(
             self.sender,
             self.block_hash,
@@ -51,25 +83,49 @@ class Attestation(Serializable):
         return atns.hash()
 
     def recoverAddress(self) -> bytes:
+        """
+        Method for signer canonical address recovery.
+        """
         signature = keys.Signature(vrs=(self.v, self.r, self.s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
         return pk.to_canonical_address()
     
     def verifySig(self) -> bool:
+        """
+        Returns TRUE if sender's address corresponds with the signature.
+        """
         return self.recoverAddress() == self.sender
     
     def sserialize(self) -> bytes:
+        """
+        Method used to serialize the class.
+
+        Wrapper for function 'rlp.encode()'
+        """
         return encode(self)
     
     def getVerdict(self) -> bool:
+        """
+        Returns TRUE of attestation verdict is positive.
+        """
         return self.verdict == b'\x01'
 
     @classmethod
     def ddeserialize(cls, att) -> Attestation:
+        """
+        Deserializator.
+
+        Wrapper for 'rlp.decode(bytes, SerializableClass)'
+        """
         return decode(att, Attestation)
     
 
 class BlockNoSig(Serializable):
+    """
+    A serializable class for a Block without a signature, transactions and attestations.
+
+    Used to calculate a hash and signature.
+    """
     fields = [
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
@@ -79,16 +135,22 @@ class BlockNoSig(Serializable):
         ('epoch_number', big_endian_int),
         ('block_number', big_endian_int),
         ('randao_reveal', Binary.fixed_length(65, allow_empty=False)),
-        ('randao_seed', binary),#Binary.fixed_length(65, allow_empty=False)),
+        ('randao_seed', binary),
         ('beneficiary', Binary.fixed_length(20, allow_empty=False)),
         ('timestamp', big_endian_int),
         ('data', binary)
     ]
 
     def hash(self) -> bytes:
+        """
+        Calculate a keccak hash of the bytes representation.
+        """
         return keccak(encode(self))
     
     def sign(self, privK: bytes) -> BlockSig:
+        """
+        Sign the Block and thereby create a 'BlockSig' class instance.
+        """
         try:
             sk = keys.PrivateKey(privK)
             sig = sk.sign_msg_hash(self.hash())
@@ -114,6 +176,10 @@ class BlockNoSig(Serializable):
         return None
 
 class BlockSig(Serializable):
+    """
+    Block representation class possessing a signature.
+    This class does not possess transaction and attestation lists.
+    """
     fields = [
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
@@ -133,6 +199,9 @@ class BlockSig(Serializable):
     ]
 
     def getNoSig(self) -> BlockNoSig:
+        """
+        Returns 'BlockNoSig' version, omitting the block signature.
+        """
         return BlockNoSig(
             self.parent_hash,
             self.state_root,
@@ -149,17 +218,29 @@ class BlockSig(Serializable):
         )
 
     def hash(self) -> bytes:
+        """
+        Wrapper for BlockNoSig's hash method
+        """
         return self.getNoSig().hash()
 
     def recoverAddress(self):
+        """
+        Recover canonical address from block sig.
+        """
         signature = keys.Signature(vrs=(self.sig_v, self.sig_r, self.sig_s))
         pk = signature.recover_public_key_from_msg_hash(self.hash())
         return pk.to_canonical_address()
 
     def verifySig(self) -> bool:
+        """
+        Return TRUE if the block beneficiary signed the block.
+        """
         return self.recoverAddress() == self.beneficiary
     
     def addTXandAttLists(self, txs: list[TxSerializable], atts: list[Attestation]) -> BlockSerializable:
+        """
+        Return BlockSerializable instance, containing the block metadata, a signature, and the lists of Txn and Attn
+        """
         return BlockSerializable(
             self.parent_hash,
             self.state_root,
@@ -182,6 +263,9 @@ class BlockSig(Serializable):
     
 
 class BlockSerializable(Serializable):
+    """
+    A full-fledged block representation.
+    """
     fields = [
         ('parent_hash', Binary.fixed_length(32, allow_empty=False)),
         ('state_root', Binary.fixed_length(32, allow_empty=False)),
@@ -206,11 +290,17 @@ class BlockSerializable(Serializable):
     ]
 
     def recoverAddress(self):
+        """
+        Returns cannonical address of the signer.
+        """
         signature = keys.Signature(vrs=(self.sig_v, self.sig_r, self.sig_s))
         pk = signature.recover_public_key_from_msg_hash(self.rebuildHash())
         return pk.to_canonical_address()
     
     def getBlockSig(self) -> BlockSig:
+        """
+        Returns a block representation, omitting the Txn and Attn.
+        """
         return BlockSig(
             self.parent_hash,
             self.state_root,
@@ -230,10 +320,19 @@ class BlockSerializable(Serializable):
         )
 
     def rebuildHash(self):
+        """
+        Wrapper of BlockNoSig's hash method.
+        """
         return self.getBlockSig().getNoSig().hash()
     
     @classmethod
     def calculateListHash(cls, llist: list) -> bytes:
+        """
+        Calculate Merkle Tree Root hash of a provided list.
+
+        NOTE:
+        The contents should be bytes.
+        """
         hashlist = []
         for tx in llist:
             hashlist.append(tx.hash())
@@ -248,12 +347,18 @@ class BlockSerializable(Serializable):
     
     @classmethod
     def int_to_minimal_bytes(cls, n: int) -> bytes:
+        """
+        Returns an integer encoded as bytes using the minimal binary size.
+        """
         if n == 0:
             return b'\x00'
         length = (n.bit_length() + 7) // 8
         return n.to_bytes(length, byteorder='big')
     
     def verifyRandao(self, benefBLS: bytes) -> bool:
+        """
+        Returns TRUE if the 'randao_reveal' sig. corresponds with the message signed.
+        """
         randao_constant = 0
         with open('config/config.json') as f:
             config = json.load(f)
@@ -270,6 +375,10 @@ class BlockSerializable(Serializable):
         return signature.verify_msg_hash(message, pk)
     
     def verifyBlock(self, state: StateTrie, parentH: bytes, parentBlockNo: int, currReward: int, lastValidatLen: int, rSeed: bytes) -> tuple[StateTrie, bool]:
+        """
+        Main Block verification method.
+        Returns (True, NewState) in case of a good, verified block and (False, OldState) otherwise.
+        """
         # Verify block signature
         if (not self.verifySig(self.beneficiary)):
             return (state, False)
@@ -318,6 +427,12 @@ class BlockSerializable(Serializable):
         return (self.recoverAddress() == acc)
     
     def verifyTXs(self, state: StateTrie) -> bool:
+        """
+        Returns True, if all Txn in the block are valid.
+
+        NOTE:
+        Transactions do not get executed here.
+        """
         for tx in self.transactions:
             if (not state.transaction(tx, True, False)):
                 return False
@@ -325,6 +440,9 @@ class BlockSerializable(Serializable):
     
     @classmethod
     def getStateAfterExec(cls, state: StateTrie, txs: list[TxSerializable], benef: bytes, currReward: int) -> tuple[StateTrie, bool]:
+        """
+        Returns (True, NewState) if the Txn are executed correctly and without fail, (False, OldState) otherwise.
+        """
         # 1. deepcopy state to a tmp variable
         tmp = StateTrie()
         tmp.db = deepcopy(state.db)
@@ -350,14 +468,17 @@ class BlockSerializable(Serializable):
         return (tmp, True)
     
     def getStateAfterExecution(self, state: StateTrie, currReward: int) -> tuple[StateTrie, bool]:
+        """
+        Wrapper for class method 'getStateAfterExec'
+        """
         return BlockSerializable.getStateAfterExec(state, self.transactions, self.beneficiary, currReward)
         
     
     def verifyStateAfterExecution(self, state: StateTrie, currReward: int) -> tuple[StateTrie, bool]:
-        '''
+        """
         Returns the correct state of the blockchain.
         The validity of the block can be inferred from the boolean value.
-        '''
+        """
         # 1. - 4. Execute TXs
         try:
             res = self.getStateAfterExecution(state, currReward)
@@ -381,6 +502,9 @@ class BlockSerializable(Serializable):
         return (res[0], True)
     
     def verifyAttestations(self, state: StateTrie, lastValidatLen: int) -> bool:
+        """
+        Returns TRUE if all attestations are correct and if the number of positive reaches a supermajority.
+        """
         # Verify a supermajority attested
         if (len(self.attestations) < state.getValidatorSupermajorityLenFromNum(lastValidatLen)):
             return False
@@ -413,47 +537,3 @@ class BlockSerializable(Serializable):
     @classmethod
     def ddeserialize(cls, bl: bytes) -> BlockSerializable:
         return decode(bl, BlockSerializable)
-
-
-class Block():
-    def __init__(self, parent_hash: bytes, state_root: bytes, receipts_root: bytes, benef: bytes, block_num: int, timestamp: int, data = b''):
-        self.parent_hash = parent_hash
-        self.state_root = state_root
-        self.receipts_root = receipts_root
-        self.transactions_root = b''
-        self.beneficiary = benef
-        self.block_number = block_num
-        #self.gas_limit = ""
-        self.timestamp = timestamp
-        self.signature = b''
-        self.data = data
-        self.transactions = []
-
-    def addTransaction(self, tx: Transaction):
-        self.transactions.append(tx)
-
-    def serializeNoSig(self):
-        return encode(BlockNoSig(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.data))
-
-    def serializeSig(self):
-        return encode(BlockSig(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data))
-
-    def sserialize(self):
-        return encode(BlockSerializable(self.parent_hash, self.state_root, self.transactions_root, self.receipts_root, self.block_number, self.beneficiary, self.timestamp, self.signature.to_bytes(), self.data, []))
-    
-    def serializeTxs(self):
-        txs = []
-        for tx in self.transactions:
-            txs.append(tx.sserialize())
-        return txs
-
-    def sign(self, pub_key: str):
-        self.calculateTxHash()
-        b = self.serializeNoSig()
-        hash = keccak(b)
-
-        pk = keys.PrivateKey(bytes.fromhex(pub_key))
-        self.signature = pk.sign_msg_hash(hash)
-
-    def gossip():
-        pass

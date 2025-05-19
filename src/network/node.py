@@ -1,3 +1,26 @@
+"""
+network/node.py
+
+This module handles network and peer logic and message forwarding to and from blockchain process.
+
+Example:
+    You can use this as a module:
+        from network.node import Node
+
+    MSG format:
+    {
+        id:             str(nodeID),
+        type:           str(messageType),
+        subtype:        str(messageSubType),
+        sender:         tuple[nodeID, nodeIp, nodePort],
+        payload_length  int,
+        payload:        dict(RPC)
+    }
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 import asyncio
 from uuid import uuid4
 import json
@@ -5,27 +28,20 @@ from collections import deque
 from blockchain.utils import chainLog
 from network.peer import Peer, to_int, fit_X
 from network.message import Message, MessageHeader
-from rlp import encode, decode
 from middleware.rpc import RPC, Param
 from middleware.middleware import Postman
 from chainlogger.logger import setupLogger
 import random
 
-# MSG:
-# {
-#   id:             str(nodeID),
-#   type:           str(messageType),
-#   subtype:        str(messageSubType),
-#   sender:         tuple[nodeID, nodeIp, nodePort],
-#   payload_length  int,
-#   payload:        dict(RPC)
-# }
+
 
 class Node:
     def __init__(self, bridge: Postman, host: str, port: int, bstrapPeers: set[Peer], loggerQueue = None, id: str = ''):
+        """
+        Network node class, handling peer communication and RPC forwarding to Blockchain layer.
+        """
         self.node = Peer.create(str(uuid4()) if not id else id, host, port)
         self.peers: set[Peer] = bstrapPeers
-        # print(f'[{self.node.getId()}]: PeerList = {self.peers}')
         self.peerIds: set[str] = set()
         self.activePeers: set[Peer] = set()
         self.server = None
@@ -43,12 +59,18 @@ class Node:
         chainLog(self.nodelogger, self.node.getId(), True, fn, msg)
 
     def getActiveIds(self) -> set[str]:
+        """
+        Returns node IDs of active peers.
+        """
         res = set()
         for p in self.activePeers:
             res.add(p.getId())
         return res
     
     def getNonActivePeers(self) -> set[Peer]:
+        """
+        Returns node IDs of inactive peers.
+        """
         res = set()
         for p in self.peers:
             if p not in self.activePeers:
@@ -78,7 +100,9 @@ class Node:
 
 
     async def listenToBlockchain(self):
-        # print(f"[{self.node.getId()}]: Listening to Middleware starts")
+        """
+        Blockchain RPC handler.
+        """
         while not self.shutdown_event.is_set():
             msg = self.middleware.recv()
             if msg and type(msg) == RPC:
@@ -90,21 +114,31 @@ class Node:
                     except Exception as e:
                         self.log('Blockchain Listener', f"Exception: {e}")
                     continue
+                # passBlock with no active peers means this is the only node.
+                # simulate empty response
                 if (msg.procedure.decode('ascii') == '/passBlock' and len(self.activePeers) == 0):
-                    # print("Got no one to get blocks from.")
                     self.middleware.send(RPC.constructRPC('/pushBlock', []))
                     continue
+                # Pass own nodeID to blockchain for logging purposes
                 if (msg.procedure.decode('ascii') == '/setAddress'):
                     self.log('Blockchain Listener', f'Sending PeerOlleh + [my address] to peer [{msg.senderId}]')
                     await self.send(msg, 'PeerOlleh', 'x', msg.senderId)
+                # Send message through the network
+                # Target the sepecified sender, if present
                 if (msg.senderId is not None):
                     await self.send(msg, '', 'x' if msg.xclusive else '', msg.senderId, [self.node] if msg.senderId != '' else None)
                 else:
+                    # Flood the message
                     await self.send(msg, '')
             await asyncio.sleep(0.1)
         self.log('Blockchain Listener', "Shutdown initiated")
 
     async def peerMgmgt(self):
+        """
+        Attempt at PeerManagement
+
+        CURRENTLY UNUSED, broken
+        """
         try:
             while not self.shutdown_event.is_set():
                 await asyncio.sleep(self.config['network']['active_redraw_time'])
@@ -124,23 +158,16 @@ class Node:
     def start(self):
         asyncio.run(self.run())
 
-    #async def connectToBootstrapPeers(self):
-    #    await self.discoverPeers()
-        #for peer in self.peers:
-            
-            #await self.sendMessage(self.getPeerHello(), peer)
-            # Ask peer for header block
-            # await self.sendMessage(self.getPeerHeaderBlock(), peer)
 
     async def handleConnection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        senderID = str(uuid4())
-        # print(f"[{self.node.getId()}]: Handle connection from [tmp {senderID}]")
+        """
+        Process incomming TCP connection
+        """
         # Handler block
         while True:
             # Read fixed-size message length
             try:
                 length = to_int(await reader.readexactly(6))
-                #print(f"[{self.node.getId()}]: MSG len: {length}")
                 # Load the whole Message
                 msgRaw = await reader.readexactly(length)
             except asyncio.IncompleteReadError:
@@ -149,9 +176,6 @@ class Node:
             # Deserialize header
             try:
                 msg = Message.ddeserialize(msgRaw)
-                # print(f'[{self.node.getId()}]: INCOMMING MESSAGE: {msg.getId()}, ({msg.header.type})')
-                # print(f'[{self.node.getId()}]: INCOM: (tmp [{senderID}] == [{msg.header.sender.getId()}])')
-                # print("PROCESS INCOMMING MSG")
                 # Process message
                 await self.handleMessage(msg, reader, writer)
             except Exception as e:
@@ -163,16 +187,23 @@ class Node:
             self.peerIds.add(peer.getId())
 
     def addPeer(self, peer: Peer) -> bool:
+        """
+        Add peer to peerlist
+        """
+        # add peer to all peers
         self.addToPeerList(peer)
         if peer.getId() not in (self.getActiveIds() | {self.node.getId()}):
             if len(self.activePeers) < self.config['network']['max_peers']:
+                # if elligible, add peer to active peers
                 self.activePeers.add(peer)
-                # print(f"[{self.node.getId()}]: ADDED peer {peer.getId()}. Peer list has {len(self.activePeers)}/{len(self.peers)} peers")
                 return True
         return False
 
 
     def getPeerMessage(self, type: str = ''):
+        """
+        Construct a peer message - part of peer discovery.
+        """
         return Message.fromDict({
             'id': str(uuid4()),
             'type': type,
@@ -181,9 +212,6 @@ class Node:
             'payload_length': 0,
             'payload': RPC.fromDict({'layer': 0, 'phase': 0, 'procedure': '', 'params': []})
         })
-    
-    def getPeerHeaderBlock(self) -> Message:
-        return self.getPeerMessage('Blocks?')
 
     def getPeerHello(self) -> Message:
         return self.getPeerMessage('PeerHello')
@@ -192,24 +220,25 @@ class Node:
         return self.getPeerMessage('PeerOlleh')
 
     async def handleMessage(self, msg: Message, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """
+        Process message, forward to blockchain.
+        """
         mmsg = msg.toDict()
         msgId = mmsg['header'].get('id')
+        # If the message is a duplicate, no need to pocess
         if self.hasSeen(msgId):
-            # print(f"[{self.node.getId()}]: I have seen message {msg.getId()}")
             return
         self.rememberMsg(msgId)
-        # print(f"[{self.node.getId()}] Received: msgid: {mmsg['header'].get('id')}/'{mmsg['header']['type']}' from {mmsg['header']['sender'].getId()}")
         # Auto-add sender to peer list
         sender: Peer = mmsg['header'].get('sender')
         # Strore reader and writer of Peer
         sender.reader = reader
         sender.writer = writer
-
+        # Set first peer hello flag
         fstPeerHello = False
         if (sender.getId() not in self.peerIds):
             fstPeerHello = True
         self.addPeer(sender)
-        # print(f'[{self.node.getId()}]: I have {len(self.activePeers)}/{len(self.peers)} peers: ({self.getActiveIds()})')
         
         if sender.getId() == self.node.getId():
             # Store connection to self separately
@@ -220,8 +249,6 @@ class Node:
         # Categorize message based on type
         msgType = mmsg['header'].get('type')
         # Subtype serves no purpose fo far
-        # msgSubType = msg.get('subtype')
-        # print(f"[{self.node.getId()}]: MSGTYPE:", msgType)
         if msgType == "PeerHello":
             if sender.getId() == self.node.getId():
                 return
@@ -233,20 +260,15 @@ class Node:
             query.senderId = sender.getId()
             self.middleware.send(query)
             # Respond with courtesy
-            # await self.sendMessage(self.getPeerOlleh(), sender, [self.node])
         elif msgType == "GetPeers":
             pass
-            #self.sendMessage(self.getPeerMessage('SetPeers', encode(list(self.peers))), sender)
         elif msgType == "SetPeers":
-            #peerList = decode(msg.payload)
-            #for p in peerList:
-            #    self.addPeer(p)
             pass
         elif msgType == "PeerOlleh":
             self.log('Message HAndler', f'Recvd PeerOlleh from [{sender.getId()}], how polite.')
-            # print(f"[{self.node.getId()}]: Received PeerOlleh from peer {mmsg['header']['sender'].getId()}")
             pass
         else:
+            # Message for blockchain
             # Synchornization logic
             # 1. Flood message if not subtype exclusive (x)
             if mmsg['header']['subtype'] != 'x' and sender.getId() != self.node.getId():
@@ -263,6 +285,9 @@ class Node:
         return msg_id in self.message_set
 
     def rememberMsg(self, msg_id):
+        """
+        Double execution protection.
+        """
         if len(self.recent_messages) == self.recent_messages.maxlen:
             old = self.recent_messages.popleft()
             self.message_set.remove(old)
@@ -270,9 +295,11 @@ class Node:
         self.message_set.add(msg_id)
 
     async def discoverPeer(self, p: Peer, i: int) -> None:
+        """
+        Mock peer discovery.
+        """
         self.log('Discover Peers', f"Opening connection {i} to {p.getHost()}:{p.getPort()}")
         if  p == self.node:
-            # print("Opening to self")
             pass
         if not p.reader and not p.writer:
             p.reader, p.writer = await asyncio.open_connection(p.getHost(), p.getPort())
@@ -289,9 +316,12 @@ class Node:
                 self.log('Closing Connections', f"Something happened when closing writer to {p.getHost()}:{p.getPort()} — {e}")
 
     async def discoverPeers(self) -> None:
+        """
+        Mock peer discovery.
+        Peers are 'discovered' from a provided peerList at initialization.
+        """
         for p in self.peers:
             self.peerIds.add(p.getId())
-        # print(f'[{self.node.getId()}]: I HAVE THESE PEERS {self.peerIds}')
         self.peers = set(self.peers)
         if len(self.peers) <= self.config['network']['max_peers']:
             self.activePeers = self.peers.copy()
@@ -299,7 +329,6 @@ class Node:
             self.activePeers = set(random.sample(self.peers, self.config['network']['max_peers']))
         i = 0
         self.activePeers = set(self.activePeers)
-        # print(f'[{self.node.getId()}]: I HAVE THESE ACTIVE PEERS {self.getActiveIds()}')
         for p in self.activePeers | {self.node}:
             await self.discoverPeer(p, i)
             i+=1
@@ -326,6 +355,9 @@ class Node:
         self.log('STOP', "Server stopped")
 
     async def send(self, payload: RPC, type: str, subtype: str = '', to: str = '', exclude: list[Peer] | None = None):
+        """
+        Blockchain send handler.
+        """
         recv = None
         if to != '':
             for p in self.peers:
@@ -340,29 +372,35 @@ class Node:
             'payload_length': payload.size(),
         })
         msg = Message(msg_header, payload)
-        # print("MSG created, ready to send")
         # Send the mesaage
         await self.sendMessage(msg, recv, exclude)
 
-    # Gossip sends messages to all peers (calls send message)
-    # Gossip is a delegator
     async def gossip(self, msg: Message):
+        """
+        Gossip sends messages to all peers (calls send message)
+        Gossip is a delegator
+        """
         await self.sendMessage(msg)
 
     async def networkSend(self, to: Peer, what: Message):
+        """
+        Send message through the network to the peer.
+        """
         msgtype = what.header.type.decode("utf-8").rstrip("\x00")
         self.log('Network Send', f'Sending message ("{msgtype}") to {to.getId()}')
         try:
             sendBytes = what.sserialize()
             if len(sendBytes) >= 2**(6*8):
                 raise Exception(f"Message too large ({len(sendBytes)}>= {2**(6*8)}).")
-            # print(f'[{self.node.getId()}]: Sending message[{what.getId()}] to [{to.getId()}]')
             to.writer.write(fit_X(len(sendBytes), 6) + sendBytes)
             await to.writer.drain()
         except Exception as e:
             self.log('NEtwork Send', f"Failed to send message to {to.getHost()}:{to.getPort()} — {e}")
 
     async def sendMessage(self, msg: Message, target: Peer | None = None, exclude: list[Peer] | None = None):
+        """
+        Low-level 'networkSend' recipient handler.
+        """
         if msg.header.type != b'\x00' * 16:
             self.rememberMsg(msg.getId())
         if target != None:

@@ -1,3 +1,26 @@
+"""
+network/message.py
+
+This module defines a class for storage and easier manipulation with the serializable network message.
+
+Example:
+    You can use this as a module:
+        from network.message import Message (, MessageHreader) 
+
+    MSG format:
+    {
+        id:             str(nodeID),                        <
+        type:           str(messageType),                   |
+        subtype:        str(messageSubType),                | MessageHeader
+        sender:         tuple[nodeID, nodeIp, nodePort],    |
+        payload_length  int,                                <
+        payload:        dict(RPC)                           < Payload
+    }
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import Binary
@@ -5,6 +28,10 @@ from middleware.rpc import RPC
 from network.peer import Peer, fit_X
 
 class MessageHeader(Serializable):
+    """
+    Network message header.
+    Contains message metadata.
+    """
     fields = [
         ('id', Binary.fixed_length(16)),
         ('type', Binary.fixed_length(16)),
@@ -58,6 +85,11 @@ class MessageHeader(Serializable):
         return encode(self)
 
 class Message(Serializable):
+    """
+    Network message serializable class.
+
+    Payload contains the Remote Procedure Class passed to the Blockchain layer.
+    """
     fields = [
         ('header', MessageHeader),
         ('payload', RPC)

@@ -1,3 +1,16 @@
+"""
+network/peer.py
+
+This module stores and simplifies manipulation with peers
+
+Example:
+    You can use this as a module:
+        from network.peer import Peer, fit_X, to_int
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from asyncio import StreamReader, StreamWriter
 from rlp import Serializable, encode
@@ -7,6 +20,9 @@ PEER_SIZE = 36
 MESSAGE_HEADER_SIZE = PEER_SIZE + 10
 
 class Peer(Serializable):
+    """
+    Construct storing serializable peer data.
+    """
     # Port is expected in range <2^0;2^15)
     fields = [
         ('id', Binary.fixed_length(16)),
@@ -15,6 +31,9 @@ class Peer(Serializable):
     ]
 
     def __init__(self, *args, **kwargs):
+        """
+        Peer objects contain unserializable reader, writer pair.
+        """
         super().__init__(*args, **kwargs)
         self.reader: StreamReader | None = None
         self.writer: StreamWriter | None = None
@@ -67,6 +86,9 @@ class Peer(Serializable):
     
 
 def fit_X(val: str | bytes | int | None, x: int = 16) -> bytes:
+    """
+    Returns value in a binary form, extended/truncated to x bytes
+    """
     if val is None:
         return b'\x00' * x
     if isinstance(val, str):
@@ -76,6 +98,9 @@ def fit_X(val: str | bytes | int | None, x: int = 16) -> bytes:
     return val[:x].ljust(x, b'\x00')
 
 def to_int(val: bytes | None) -> int:
+    """
+    Conversion from bytes to an integer.
+    """
     if val is None:
         return 0
     return int.from_bytes(val, byteorder='big')

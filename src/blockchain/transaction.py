@@ -1,4 +1,17 @@
 # Format of a transaction
+"""
+blockchain/transaction.py
+
+This module defines serializable classes for transactions, allowing simple signing and modification.
+
+Example:
+    You can use this as a module:
+        from blockchain.transaction import TxSerializable, TxMeta (, *)
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from __future__ import annotations
 from rlp import Serializable, encode, decode
 from rlp.sedes import big_endian_int, Binary, binary, CountableList
@@ -7,6 +20,9 @@ from eth_utils import keccak
 
 
 class TxSerializableNoSig(Serializable):
+    """
+    Serializable representation of a Transaction, without a sig.
+    """
     fields = [
         ('nonce', big_endian_int),
         ('type', big_endian_int),
@@ -20,9 +36,15 @@ class TxSerializableNoSig(Serializable):
     ]
 
     def hash(self) -> bytes:
+        """
+        Calculate a keccak hash of the bytes representation.
+        """
         return keccak(encode(self))
     
     def sign(self, privK: bytes) -> TxSerializable:
+        """
+        Sign the Tx and thus return the TxSerializable instance.
+        """
         sk = keys.PrivateKey(privK)
         sig = sk.sign_msg_hash(self.hash())
         return TxSerializable(
@@ -39,14 +61,12 @@ class TxSerializableNoSig(Serializable):
             sig.s
         )
 
-
-class FnCallArg(Serializable):
-    fields = [
-        ('type', big_endian_int),
-        ('value', binary)
-    ]
-
 class TxMetaNoSig(Serializable):
+    """
+    A meta transaction representation.
+
+    Forwarder is a nonce-like value used for Meta Txn.
+    """
     fields = [
         ('forwarder', big_endian_int),
         ('sender', Binary.fixed_length(20, allow_empty=False)),
@@ -73,6 +93,9 @@ class TxMetaNoSig(Serializable):
         )
 
 class TxMeta(Serializable):
+    """
+    Meta transaction.
+    """
     fields = [
         ('forwarder', big_endian_int),
         ('sender', Binary.fixed_length(20, allow_empty=False)),
@@ -100,6 +123,9 @@ class TxMeta(Serializable):
         return pk.to_canonical_address()
     
     def verifySig(self) -> bool:
+        """
+        Returns TRUE if the sender is the signer.
+        """
         return self.recoverAddress() == self.sender
     
     def sserialize(self) -> bytes:
@@ -110,6 +136,17 @@ class TxMeta(Serializable):
         return decode(txm, TxMeta)
 
 class TxSerializable(Serializable):
+    """
+    Transaction representation.
+
+    NOTE:
+    Tx types are:
+    0 -> Normal transfer
+    1 -> Reassignment of social capital
+    2 -> Registration of identity (can award SC)
+    3 -> Registration of social media (can receive SC and produce blocks)
+    4 -> Replacement TX (untested)
+    """
     fields = [
         ('nonce', big_endian_int),
         # 0 -> normal
@@ -169,6 +206,11 @@ class TxSerializable(Serializable):
         return self.recoverAddress() == self.sender
     
     def getFeasibilityMetric(self) -> float:
+        """
+        Return Tx's feasibility metric.
+
+        The metric is fee/B.
+        """
         txBytes = len(encode(self))
         return self.fee / txBytes
     
@@ -179,6 +221,14 @@ class TxSerializable(Serializable):
         timestamp: int | None = None, data: bytes | None = None,
         v: int | None = None, r: int | None = None, s: int | None = None 
     ) -> TxSerializable:
+        """
+        A monolith used to update a Transaction.
+
+        Implemented for ease of use.
+        
+        NOTE:
+        This method returns a new instance of 'TxSerializable' as any 'rlp.Serializable' class is immutable.
+        """
         return TxSerializable(
             self.nonce + 1 if nonce else self.nonce,
             type if not None else self.type,
@@ -201,6 +251,9 @@ class TxSerializable(Serializable):
         return decode(tx, TxSerializable)
     
     def eq(self, b: TxSerializable) -> bool:
+        """
+        Returns TRUE if a Tx 'b' is equal to this one.
+        """
         return (
             self.nonce == b.nonce and
             self.type == b.type and
@@ -214,48 +267,3 @@ class TxSerializable(Serializable):
             self.r == b.r and
             self.s == b.s
         )
-
-class Transaction():
-    def __init__(self, sender: bytes, to: bytes, value: int, type: int, gas_limit: int, gas_price: int, data = b''):
-        self.sender = sender
-        self.to = to
-        self.value = value
-        self.type = type 
-        self.gas_limit = gas_limit
-        self.gas_price = gas_price
-        self.data = data
-        self.r = 0
-        self.v = 0
-        self.s = 0
-        self.hash = 0
-        self.signature = None  # (v, r, s)
-    
-    def serializeNoSig(self):
-        return encode(TxSerializableNoSig(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data))
-        #return (to_bytes(self.nonce) + to_bytes(self.gas_price) + to_bytes(self.gas_limit) + self.to + to_bytes(self.value) + self.data)
-
-    def sserialize(self):
-        return encode(TxSerializable(self.type, self.gas_price, self.gas_limit, self.sender, self.to, self.value, self.data, self.v, self.r, self.s))
-
-    def hashTx(self):
-        tx = self.serializeNoSig()
-        self.hash = keccak(tx)
-    
-    def sign(self, private_key: str, chain_id=1):
-        self.v = chain_id
-        if not self.hash:
-            self.hashTx()
-
-        pk = keys.PrivateKey(bytes.fromhex(private_key))
-        self.signature = pk.sign_msg_hash(self.hash)
-        self.v = self.signature.v + (chain_id * 2 + 35)
-        self.r = self.signature.r
-        self.s = self.signature.s
-
-    def gossip(self):
-        pass
-
-def to_bytes(val: int) -> bytes:
-    if val == 0:
-        return b''
-    return val.to_bytes((val.bit_length() + 7) // 8, byteorder='big')

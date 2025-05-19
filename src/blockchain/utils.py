@@ -1,3 +1,17 @@
+"""
+blockchain/account.py
+
+This module defines utility functions and classes.
+It provides a Genesis state creator for initial startup.
+
+Example:
+    You can use this as a module:
+        from blockchain.utils import chainLog, Genesis
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from blockchain.account import AccSerializable, AffiliateMedia
 from blockchain.block import BlockSerializable, BlockNoSig
 from blockchain.state import StateTrie
@@ -14,6 +28,9 @@ import json
 
 
 def chainLog(logger, nodeId: str, nodeProc: bool | None, fnMethod: str, message: str = ''):
+    """
+    Logging function.
+    """
     if nodeProc is not None:
         np = "NODE" if nodeProc else "BLOCKCHAIN"
     else:
@@ -23,12 +40,17 @@ def chainLog(logger, nodeId: str, nodeProc: bool | None, fnMethod: str, message:
 
 
 class Genesis:
-
+    """
+    Factory class for the Genesis block and state
+    """
     def __init__(self):
         with open('config/config.json') as f:
             self.config = json.load(f)
 
     def constructGenesisBlock(self) -> BlockSerializable:
+        """
+        Returns the Genesis block as described in '/src/config/confic.json'
+        """
         return BlockSerializable(
             bytes.fromhex(self.config['genesis']['parent_hash']),
             bytes.fromhex(self.config['genesis']['parent_hash']),
@@ -50,9 +72,15 @@ class Genesis:
         )
     
     def getGenesisRandomness(self) -> bytes:
+        """
+        Returns initial Randao Randomness.
+        """
         return bytes.fromhex(self.config['sc_constants']['domain_randao'])
 
     def getGenesisState(self) -> StateTrie:
+        """
+        Returns the Genesis state.
+        """
         st = StateTrie()
         for a in self.config['genesis']['alloc']:
             st.addAccount(AccSerializable.blank().update(balance=to_int(a['balance'].encode('ascii'))), bytes.fromhex(a['address']))
@@ -70,6 +98,11 @@ class Genesis:
         return st
 
     def Eve(self):
+        """
+        Factory of a default profile.
+
+        DO NOT USE. THIS PROFILE IS NOT IN GENESIS.
+        """
         private_key_bytes = keccak('uzumymv'.encode('ascii'))
         sk = keys.PrivateKey(private_key_bytes)
         pk = sk.public_key
@@ -77,17 +110,18 @@ class Genesis:
         eve = AccSerializable.blank()
         id = keccak('uzumymv'.encode('ascii'))
         eve = eve.update(balance=1000000000000000, id_hash=id, passive_sc=50, active_sc=700, validator_pub_key=pk.to_bytes(), soc_media=[AffiliateMedia(b'\x01', 'Heaven'.encode('ascii'), b'\x00' * 288)])
-        #print("FACTORY: user balance", eve.balance)
         eveAddress = pk.to_canonical_address()
 
         state = StateTrie()
         state.addAccount(eve, eveAddress)
         state.addValidator(eveAddress, 1000)
-        #print(eveAddress.hex())
 
         return ((sk, pk), eveAddress, eve)
 
     def rand(self):
+        """
+        Generate random credentials - (sk, pk).
+        """
         private_key_bytes = urandom(32)
         sk = keys.PrivateKey(private_key_bytes)
         pk = sk.public_key
@@ -100,6 +134,9 @@ class Genesis:
 # SK: cb3f5373710ac12cf54a3623c98622548246ede6dd4797ab7ee23493c9d7bba9
 
     def Adam(self):
+        """
+        Default content creator, required for function.
+        """
         private_key_bytes = keccak('hesoyam'.encode('ascii'))
         sk = keys.PrivateKey(private_key_bytes)
         pk = sk.public_key

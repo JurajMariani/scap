@@ -1,4 +1,17 @@
-# populator.py
+"""
+populator.py
+
+This module creates N Bootstrapper processes to simulate a functional network.
+
+Example:
+    You can run this module directly:
+        $ python populator.py
+    To change N, edit the call in main (styles list has to match this value)
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 import multiprocessing
 from bootstrapper import Bootstrapper
 from network.peer import Peer

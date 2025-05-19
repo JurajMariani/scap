@@ -1,3 +1,18 @@
+"""
+bootstrapper.py
+
+This module starts the network and blockchain processes.
+
+Example:
+    You can run this module directly:
+        $ python bootstrapper.py
+    Or as a module:
+        from bootstrapper import Bootstrapper
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from multiprocessing import Process, Queue
 from blockchain.blockchain import Blockchain
 from blockchain.utils import chainLog
@@ -10,6 +25,11 @@ import atexit
 import os
 
 class Bootstrapper:
+    """
+    Initializer class.
+
+    Starts the node and blockchain processes.
+    """
     def __init__(self, ip: str = '127.0.0.1', port: int = 5000, adam = True, peerlist: list[Peer] = [], nodeId: str = '', loggerQueue = None, style: int = 0):
         g = Genesis()
         self.c = g.Adam() if adam else g.rand()
@@ -33,11 +53,6 @@ class Bootstrapper:
 
     def wipeStorage(self):
         directory = './storage'
-        for filename in os.listdir(directory):
-            file_path = os.path.join(directory, filename)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-        directory = './storage/zkp/'
         for filename in os.listdir(directory):
             file_path = os.path.join(directory, filename)
             if os.path.isfile(file_path):

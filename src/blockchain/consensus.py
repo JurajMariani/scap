@@ -1,3 +1,16 @@
+"""
+blockchain/consensus.py
+
+This module defines a class handling leader election and block validation logic.
+
+Example:
+    You can use this as a module:
+        from blockchain.consensus import PoSC
+
+Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Date: 19/05/2025
+"""
+
 from rlp.sedes import binary
 from math import sqrt, log2, log10, log
 import json
@@ -7,6 +20,9 @@ from blockchain.block import Attestation, BlockSerializable
 from blockchain.randao import Randao
 
 class PoSC:
+    """
+    Class for leader election and proposed block validation.
+    """
     def __init__(self):
         self.validators: dict[bytes, int] = {}
         self.randao = Randao()
@@ -15,6 +31,9 @@ class PoSC:
         self.proposedBlock: BlockSerializable | None = None
 
     def updateValidatorList(self, state: StateTrie) -> bool:
+        """
+        Based on the STATE, update the list and effective social capital of consensus nodes.
+        """
         scalingFn = ''
         with open('config/config.json') as f:
             config = json.load(f)
@@ -49,12 +68,13 @@ class PoSC:
         return True
 
     def selectLeader(self, state: StateTrie) -> bytes | None:
-        """Select the next validator based on their stake and Randao randomness."""
+        """
+        Select the next validator based on their effective social capital (stake) and Randao randomness.
+        """
         # Refresh current leader
         self.leader = None
         # Get the randomness from Randao
         rngv = self.randao.getValue()
-        # print(f'[CONSENSUS]: Random value from RANDAO: [{rngv}].', flush=True)
         # Update the list of validators
         if not self.updateValidatorList(state):
             return None
@@ -69,24 +89,25 @@ class PoSC:
             if (rngvSewed < cumulative_sc):
                 self.leader = address
                 return address
-        # Obsolete assignment
-        # self.leader = None
         return None
     
     def getLeader(self) -> bytes | None:
+        """
+        Returns the current leader, if there is one.
+        """
         return self.leader
 
     def attest(self, state: StateTrie, parentHash: bytes, parentBNumber: int, cRew: int, lastValidatLen: int, bl: BlockSerializable) -> tuple[StateTrie, bool]:
+        """
+        Verify the validity of a proposed block.
+
+        This method is a basis for Attestation issuance.
+        """
         # Maybe redundant
         self.proposedBlock = bl
         # Beneficiary must match current leader
         if self.getLeader() != bl.beneficiary:
             return (state, False)
         # Validate block
-        # print(self.randao.seed)
         return bl.verifyBlock(state, parentHash, parentBNumber, cRew, lastValidatLen, self.randao.get_seed())
     
-    # randao seed 
-    # b'\xb3do\x89\x02\xa9=\xae\x9f\x95"\xffo\xfa\x8a\x82\x94+\x89}W\xa6\xec_\xfd\x00A\xe6#\xf3i4'
-    # b'\xb3do\x89\x02\xa9=\xae\x9f\x95"\xffo\xfa\x8a\x82\x94+\x89}W\xa6\xec_\xfd\x00A\xe6#\xf3i4'
-        
