@@ -48,6 +48,7 @@ class Bootstrapper:
         self.logger = setupLogger(loggerQueue)
         self.playStyle = style
         atexit.register(self.cleanup)
+        os.makedirs("./storage/zkp", exist_ok=True)
         self.wipeStorage()
 
 
