@@ -8,7 +8,7 @@ Example:
     You can use this as a module:
         from blockchain.utils import chainLog, Genesis
 
-Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Author: XXXXXXXXXX
 Date: 19/05/2025
 """
 

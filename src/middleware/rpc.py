@@ -17,7 +17,7 @@ Example:
         6. TxMeta
         7. Attestation
 
-Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Author: XXXXXXXXXX
 Date: 19/05/2025
 """
 

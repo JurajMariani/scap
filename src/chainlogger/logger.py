@@ -3,7 +3,7 @@ chainlogger/logger.py
 
 This module defines initialization functions for a logging.Log object.
 
-Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Author: XXXXXXXXXX
 Date: 19/05/2025
 """
 

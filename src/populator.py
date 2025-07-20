@@ -8,7 +8,7 @@ Example:
         $ python populator.py
     To change N, edit the call in main (styles list has to match this value)
 
-Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Author: XXXXXXXXXX
 Date: 19/05/2025
 """
 
@@ -22,7 +22,7 @@ import time
 # Style 0 - only send TXs
 # Style 1 - Register and Endorse, then switch to 0
 # Style 2 - Resgister, Endorse, Become validator, then 0
-styles = [0, 2, 2, 2]
+styles = [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
 # Create the log queue
 log_queue = multiprocessing.Queue()
 listener = multiprocessing.Process(target=loggerListener, args=(log_queue,))
@@ -56,4 +56,4 @@ def populate(n: int, base_port=5000):
     listener.join()
 
 if __name__ == "__main__":
-    populate(4)
+    populate(10)

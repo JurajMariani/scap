@@ -10,7 +10,7 @@ Example:
     Or a test for correct ZoKrates installation and configuration:
         ~/path/to/src$ python3 -m blockchain.zkp_manager
 
-Author: Bc. Juraj Marini, <xmaria03@stud.fit.vutbr.cz>
+Author: XXXXXXXXXX
 Date: 19/05/2025
 """
 
