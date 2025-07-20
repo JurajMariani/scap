@@ -11,7 +11,7 @@
         "scaling": "root"
     },
     "constraints": {
-        "tx_limit": 5,
+        "tx_limit": 25,
         "replacement_tx_fee_multiplier": 5
     },
     "consensus": {

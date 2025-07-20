@@ -369,7 +369,7 @@ class StateTrie:
         # Move sc from metaTX sender, register endorsement
         scSenderUpdate = scSender.update(forwarder=True, passive_sc=(scSender.passive_sc - metaTx.sc), endorsed=endorsedList)
         # Add sc to receiver, register endorsement
-        endorsed_byList = list(scSender.endorsed_by)
+        endorsed_byList = list(scBeneficiary.endorsed_by)
         idx = self.findAddrInEndorsementList(endorsed_byList, metaTx.sender)
         if metaTx.sc < 0:
             # if already endorsed, decrease the value associated with that address
@@ -391,7 +391,7 @@ class StateTrie:
         else:
             return False
         
-        scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList, balance=(scSender.balance - tx.fee))
+        scBeneficiaryUpdate = scBeneficiary.update(nonce=True, active_sc=(scBeneficiary.active_sc + metaTx.sc), endorsed_by=endorsed_byList, balance=(scBeneficiary.balance - tx.fee))
         # Register changes
         self.updateAccount(metaTx.sender, scSenderUpdate)
         self.updateAccount(tx.sender, scBeneficiaryUpdate)

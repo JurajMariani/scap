@@ -231,6 +231,9 @@ class Blockchain:
         for att in self.attestationList:
             if att.block_hash == self.chain.rebuildHash():
                 attList.append(att)
+        # Verify that the number of attestation forms a system supermajority
+        if len(attList) < self.state.getValidatorSupermajorityLenFromNum(self.lastRoundValidatorCount):
+            return None
         # Order TXs based on feasibility metric
         # feasibility metric: unit fee per byte
         # Pick n best
@@ -280,7 +283,11 @@ class Blockchain:
         st = self.state.clone()
         if st.verifyMetaTX(txm):
             # For simplicity's sake, we accept every request
-            self.generateTX(1, random.randint(1000, 2000), b'', 0, txm.sserialize(), MetaTX=True)
+            fee = random.randint(10000, 20000)
+            self.generateTX(1, fee, b'', 0, txm.sserialize(), MetaTX=True)
+            #print(f'ISSUING REASSIGN FOR ${fee}')
+        #else:
+            #print('RECEIVED REASSIGN REQUEST, BUT DENIED')
     
     def generateReassign(self, recp: bytes, value: int) -> TxMeta:
         """
@@ -411,7 +418,7 @@ class Blockchain:
             int(time.time()),
             txData
         )
-        self.log('generateTX', f'GENERATED TX ({type})')
+        self.log('generateTX', f'GENERATED TX ({type}:{self.nonce}:{self.address.hex()})')
         self.nonce += 1
         # Verify TX before sending
         ttx = tx.sign(self.secretKey.to_bytes())
@@ -614,8 +621,9 @@ class Blockchain:
         blockwait = 0
         blockno = 0
         vczkp = b''
+        await asyncio.sleep(10)
         while not self.shutdownEvent.is_set():
-            await asyncio.sleep(4)
+            await asyncio.sleep((1.0/10.0))
             if self.gettingReady:
                 continue
             if (len(self.peerAddresses) == 0):
@@ -634,7 +642,7 @@ class Blockchain:
                     # This style gossips a registration Tx
                     # Then waits until it is in a block
                     # Then distributes SC
-                    # Then sneds notmal Txs
+                    # Then sends notmal Txs
                     if (self.state.getAccount(self.address).isVerified() and self.playStyle != 5):
                         if self.playStyle in (7, 8):
                             self.log('USER', 'Account has been verified!')
@@ -645,7 +653,7 @@ class Blockchain:
                         else:
                             if self.playStyle != 10:
                                 # Generate Soc Media TX
-                                if not self.generateTX(3, random.randint(1000, 2000), b'', 0, b'', validator_pub_key=self.pubk.to_bytes(), media=[(True, 'YouTube', b'\x10' * 288)]):
+                                if not self.generateTX(3, random.randint(10000, 20000), b'', 0, b'', validator_pub_key=self.pubk.to_bytes(), media=[(True, 'YouTube', b'\x10' * 288)]):
                                     continue
                                 else:
                                     self.log('USER', 'Registrating Social Media')
@@ -659,17 +667,22 @@ class Blockchain:
                                     self.playStyle = 5
                                     #print(f'[{self.nodeId}]: [genTX]: Setting style to 0 - {self.playStyle}.', flush=True)
                     elif self.playStyle == 5:
+                        #print(f'{self.nodeId}:{self.address.hex()} has reached style 5')
                         if blockwait == 0 or blockwait == blockno:
                             if self.account.passive_sc == 0:
+                                #print(f'{self.nodeId}:{self.address.hex()} has no pSCap, changing style to 0')
                                 self.playStyle = 0
                                 continue
                             else:
                                 # Find a validator capable of receiving SC
                                 recp = random.sample(list(self.state.getValidators().keys()), 1)[0]
                                 # Generate MetaTX of SC assignment
-                                if not self.generateTX(1, 0, recp, random.randint(0, self.account.passive_sc)):
+                                if not self.generateTX(1, 0, recp, random.randint(1, self.account.passive_sc)):
+                                    blockwait = self.chain.block_number + 3
+                                    #print('cant endorse')
                                     continue
-                                blockwait = self.chain.block_number + 2
+                                blockwait = self.chain.block_number + 10
+                                #print('endorsing')
                                 self.log('USER', f'Endorsing {recp.hex()}')
                     else:
                         if self.playStyle not in (7, 8):
@@ -677,7 +690,7 @@ class Blockchain:
                                 vczkp = await asyncio.to_thread(generate, self.nodeId + str(int(time.time())))
                                 if not vczkp:
                                     continue
-                            if not self.generateTX(2, random.randint(1000, 2000), b'', 0, b'', id_hash=urandom(32), vc_zkp=vczkp):
+                            if not self.generateTX(2, random.randint(10000, 20000), b'', 0, b'', id_hash=urandom(32), vc_zkp=vczkp):
                                 continue
                             self.log('USER', 'ID hash sent, waiting to get registered')
                             if self.playStyle == 1:
@@ -769,7 +782,7 @@ class Blockchain:
                     except Exception as e:
                         self.log('GameplayLoop', f'EXCEPTION: {e}')
                     if not self.waiting:
-                        await asyncio.sleep(10)
+                        await asyncio.sleep(0.01)
                 self.log('GameplayLoop', "Block generated")
                 while self.waiting:
                     await asyncio.sleep(0.1)
