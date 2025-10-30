@@ -78,4 +78,4 @@ Multi-machine tests were also conducted, running 10 processes per device across 
 
 ## Additional Information
 
-Information regarding implementation can be found in the text of the thesis. The actual implementation can be found in the [implementation folder](/Legacy/src/readme.md) or on [GitHub](https://github.com/JurajMariani/scap/tree/main).
+Information regarding implementation can be found in the text of the thesis. The actual implementation can be found in the [implementation folder](/Legacy/src/) or on [GitHub](https://github.com/JurajMariani/scap/tree/main).

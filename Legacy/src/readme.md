@@ -1,4 +1,4 @@
-# Implementation
+# Legacy Implementation
 
 This folder contains the core (now legacy) implementation of the consensus protocol proof-of-concept. It is structured to separate networking, blockchain logic, and utility components for modularity and clarity.
 
