@@ -48,11 +48,11 @@ changes would be registered on the blockchain as special transactions.
 
 ### Excel@FIT resources
 
-This thesis has been presented on the conference [Excel@FIT 2025](https://excel.fit.vutbr.cz/).
+This thesis has been presented on a student conference [Excel@FIT 2025](https://excel.fit.vutbr.cz/).
 Along with a short digest of the thesis, there is a poster (2 versions) that has been submitted to this conference and is available in the materials of this project.
 The resources can be found in [this folder](/Excel@FIT/).
 
-### Implementation
+### Implementation (Legacy)
 
 This project adopts a microservice-inspired architecture at the local node level by splitting each logical node into two independent processes:
 
@@ -76,6 +76,6 @@ A custom script (`/src/populator.py`) enables simulation of a peer-to-peer netwo
 
 Multi-machine tests were also conducted, running 10 processes per device across two networked computers.
 
-### Additional Information
+## Additional Information
 
-Information regarding implementation can be found in the text of the thesis. The actual implementation can be found in the [implementation folder](/src/) or on [GitHub](https://github.com/JurajMariani/scap/tree/main).
+Information regarding implementation can be found in the text of the thesis. The actual implementation can be found in the [implementation folder](/Legacy/src/readme.md) or on [GitHub](https://github.com/JurajMariani/scap/tree/main).
